@@ -1,7 +1,7 @@
 """pysepal-api — UI-free HTTP client for SEPAL services."""
 
 from .auth import ApiKeyAuth, CookieAuth, NoAuth, detect_auth
-from .client import SepalClient
+from .client import AsyncSepalClient, SepalClient
 from .errors import (
     BadRequest,
     Conflict,
@@ -30,6 +30,7 @@ __version__ = "0.1.0.dev0"
 
 __all__ = [
     "ApiKeyAuth",
+    "AsyncSepalClient",
     "CookieAuth",
     "NoAuth",
     "SepalClient",
