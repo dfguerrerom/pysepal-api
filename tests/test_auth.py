@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import httpx
@@ -38,6 +37,7 @@ def test_api_key_auth_from_sandbox_strips_whitespace(tmp_path: Path) -> None:
     auth = ApiKeyAuth.from_sandbox(str(key_file))
     req = _run_auth(auth)
     import base64
+
     expected = base64.b64encode(b":abc-123").decode()
     assert req.headers["Authorization"] == f"Basic {expected}"
 

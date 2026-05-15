@@ -1,4 +1,3 @@
-import asyncio
 import inspect
 
 import pytest
@@ -23,15 +22,12 @@ PAIRS = [
 @pytest.mark.parametrize("sync, async_", PAIRS)
 def test_method_names_match(sync: type, async_: type) -> None:
     sync_methods = {
-        name
-        for name, value in vars(sync).items()
-        if callable(value) and not name.startswith("_")
+        name for name, value in vars(sync).items() if callable(value) and not name.startswith("_")
     }
     async_methods = {
         name
         for name, value in vars(async_).items()
-        if (callable(value) or inspect.iscoroutinefunction(value))
-        and not name.startswith("_")
+        if (callable(value) or inspect.iscoroutinefunction(value)) and not name.startswith("_")
     }
     assert sync_methods == async_methods
 

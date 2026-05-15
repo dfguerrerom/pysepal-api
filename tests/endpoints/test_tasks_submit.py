@@ -43,9 +43,7 @@ def test_submit_posts_task_body(http: httpx.Client) -> None:
 
 def test_submit_omits_optional_keys(http: httpx.Client) -> None:
     with respx.mock(base_url="https://sepal.test") as mock:
-        route = mock.post("/api/tasks").respond(
-            200, json={"id": "t-2", "state": "PENDING"}
-        )
+        route = mock.post("/api/tasks").respond(200, json={"id": "t-2", "state": "PENDING"})
         endpoint = TasksEndpoint(http)
         endpoint.submit(operation="x", params={})
         body = json.loads(route.calls.last.request.content)

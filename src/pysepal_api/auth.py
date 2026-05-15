@@ -40,9 +40,7 @@ class ApiKeyAuth(httpx.Auth):
     def __repr__(self) -> str:
         return "ApiKeyAuth(***)"
 
-    def auth_flow(
-        self, request: httpx.Request
-    ) -> Generator[httpx.Request, httpx.Response, None]:
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
         request.headers["Authorization"] = self._header
         yield request
 
@@ -70,9 +68,7 @@ class CookieAuth(httpx.Auth):
     def __repr__(self) -> str:
         return "CookieAuth(***)"
 
-    def auth_flow(
-        self, request: httpx.Request
-    ) -> Generator[httpx.Request, httpx.Response, None]:
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
         existing = request.headers.get("Cookie", "")
         cookie = f"SEPAL-SESSIONID={self._session_id}"
         request.headers["Cookie"] = f"{existing}; {cookie}" if existing else cookie
@@ -82,9 +78,7 @@ class CookieAuth(httpx.Auth):
 class NoAuth(httpx.Auth):
     """Explicitly disable auth (tests, mock servers)."""
 
-    def auth_flow(
-        self, request: httpx.Request
-    ) -> Generator[httpx.Request, httpx.Response, None]:
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
         yield request
 
 

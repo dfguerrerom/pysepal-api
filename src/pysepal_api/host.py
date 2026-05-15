@@ -31,6 +31,5 @@ def detect_base_url() -> str:
     if host:
         return normalize_base_url(host)
     raise MissingHostError(
-        "No SEPAL host configured. Pass base_url=..., set SEPAL_HOST, "
-        "or set SEPAL_ENDPOINT."
+        "No SEPAL host configured. Pass base_url=..., set SEPAL_HOST, " "or set SEPAL_ENDPOINT."
     )

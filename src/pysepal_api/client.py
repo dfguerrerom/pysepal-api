@@ -13,7 +13,6 @@ from .endpoints.user_files import AsyncUserFilesEndpoint, UserFilesEndpoint
 from .host import detect_base_url, normalize_base_url
 from .paths import BASE_REMOTE_PATH
 
-
 _LOCAL_HOSTS = ("host.docker.internal", "danielg.sepal.io")
 
 
@@ -47,16 +46,10 @@ class SepalClient:
         verify: bool | None = None,
     ) -> None:
         resolved_base_url = normalize_base_url(
-            base_url
-            or (f"https://{sepal_host}" if sepal_host else None)
-            or detect_base_url()
+            base_url or (f"https://{sepal_host}" if sepal_host else None) or detect_base_url()
         )
-        resolved_auth = auth or (
-            CookieAuth(session_id) if session_id else detect_auth()
-        )
-        resolved_verify = verify if verify is not None else _verify_for(
-            resolved_base_url
-        )
+        resolved_auth = auth or (CookieAuth(session_id) if session_id else detect_auth())
+        resolved_verify = verify if verify is not None else _verify_for(resolved_base_url)
 
         self.module_name = module_name
         self.base_url = resolved_base_url
@@ -110,16 +103,10 @@ class AsyncSepalClient:
         verify: bool | None = None,
     ) -> None:
         resolved_base_url = normalize_base_url(
-            base_url
-            or (f"https://{sepal_host}" if sepal_host else None)
-            or detect_base_url()
+            base_url or (f"https://{sepal_host}" if sepal_host else None) or detect_base_url()
         )
-        resolved_auth = auth or (
-            CookieAuth(session_id) if session_id else detect_auth()
-        )
-        resolved_verify = verify if verify is not None else _verify_for(
-            resolved_base_url
-        )
+        resolved_auth = auth or (CookieAuth(session_id) if session_id else detect_auth())
+        resolved_verify = verify if verify is not None else _verify_for(resolved_base_url)
         self.module_name = module_name
         self.base_url = resolved_base_url
         self.verify_ssl = resolved_verify

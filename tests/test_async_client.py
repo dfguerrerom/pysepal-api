@@ -28,6 +28,4 @@ async def test_async_client_creates_module_dir() -> None:
             auth=NoAuth(),
             module_name="demo",
         ) as client:
-            assert str(client.results_path) == (
-                "/home/sepal-user/module_results/demo"
-            )
+            assert str(client.results_path) == ("/home/sepal-user/module_results/demo")

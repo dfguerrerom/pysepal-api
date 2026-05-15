@@ -25,9 +25,7 @@ def test_file_entry_aliases_and_is_dir() -> None:
 
 
 def test_directory_listing_envelope() -> None:
-    listing = DirectoryListing.model_validate(
-        {"path": ".", "files": [], "count": 0}
-    )
+    listing = DirectoryListing.model_validate({"path": ".", "files": [], "count": 0})
     assert listing.path == "."
     assert listing.files == []
 

@@ -1,7 +1,6 @@
 import warnings
 from pathlib import PurePosixPath
 
-import httpx
 import pytest
 import respx
 
@@ -26,12 +25,8 @@ def test_legacy_constructor_positional(base: str) -> None:
                 sepal_host="sepal.test",
             )
             try:
-                assert any(
-                    issubclass(w.category, DeprecationWarning) for w in caught
-                )
-                assert str(client.results_path) == (
-                    "/home/sepal-user/module_results/demo"
-                )
+                assert any(issubclass(w.category, DeprecationWarning) for w in caught)
+                assert str(client.results_path) == ("/home/sepal-user/module_results/demo")
                 assert client.BASE_REMOTE_PATH == "/home/sepal-user"
                 assert client.module_name == "demo"
                 assert client.base_url == "https://sepal.test"
@@ -60,9 +55,7 @@ def test_list_files_returns_dict_envelope(base: str) -> None:
         )
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            with LegacySepalClient(
-                base_url=base, auth=NoAuth(), create_base_dir=False
-            ) as client:
+            with LegacySepalClient(base_url=base, auth=NoAuth(), create_base_dir=False) as client:
                 result = client.list_files("/")
                 assert isinstance(result, dict)
                 assert result["path"] == "."
@@ -74,9 +67,7 @@ def test_get_file_returns_bytes(base: str) -> None:
         mock.get("/api/user-files/download").respond(200, content=b"data")
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            with LegacySepalClient(
-                base_url=base, auth=NoAuth(), create_base_dir=False
-            ) as client:
+            with LegacySepalClient(base_url=base, auth=NoAuth(), create_base_dir=False) as client:
                 assert client.get_file("module_results/app/out.bin") == b"data"
 
 
@@ -87,12 +78,8 @@ def test_set_file_returns_dict(base: str) -> None:
         )
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            with LegacySepalClient(
-                base_url=base, auth=NoAuth(), create_base_dir=False
-            ) as client:
-                result = client.set_file(
-                    "module_results/app/out.csv", "hello", overwrite=False
-                )
+            with LegacySepalClient(base_url=base, auth=NoAuth(), create_base_dir=False) as client:
+                result = client.set_file("module_results/app/out.csv", "hello", overwrite=False)
                 assert isinstance(result, dict)
                 assert result["path"] == "module_results/app/out.csv"
 
@@ -102,9 +89,7 @@ def test_get_remote_dir_returns_relative_path(base: str) -> None:
         mock.post("/api/user-files/createFolder").respond(200, json={})
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            with LegacySepalClient(
-                base_url=base, auth=NoAuth(), create_base_dir=False
-            ) as client:
+            with LegacySepalClient(base_url=base, auth=NoAuth(), create_base_dir=False) as client:
                 p = client.get_remote_dir("module_results/sub", parents=True)
                 assert p == PurePosixPath("module_results/sub")
 

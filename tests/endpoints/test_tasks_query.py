@@ -39,9 +39,7 @@ def test_list_optional_query_filters(http: httpx.Client) -> None:
 
 def test_get_basic(http: httpx.Client) -> None:
     with respx.mock(base_url="https://sepal.test") as mock:
-        mock.get("/api/tasks/task/t-1").respond(
-            200, json={"id": "t-1", "state": "ACTIVE"}
-        )
+        mock.get("/api/tasks/task/t-1").respond(200, json={"id": "t-1", "state": "ACTIVE"})
         endpoint = TasksEndpoint(http)
         task = endpoint.get("t-1")
         assert task.state is TaskState.ACTIVE

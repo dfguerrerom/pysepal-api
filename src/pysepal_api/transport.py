@@ -41,9 +41,7 @@ def _body_for_error(response: httpx.Response) -> Any:
     return text if len(text) <= 4096 else text[:4096] + "...[truncated]"
 
 
-def send_with_error_mapping(
-    client: httpx.Client, request: httpx.Request
-) -> httpx.Response:
+def send_with_error_mapping(client: httpx.Client, request: httpx.Request) -> httpx.Response:
     """Send a prepared request and translate failures to typed errors."""
     try:
         response = client.send(request)

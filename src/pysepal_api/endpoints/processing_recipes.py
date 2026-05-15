@@ -10,6 +10,7 @@ Confirmed routes (v0):
 
 from __future__ import annotations
 
+import builtins
 import gzip
 import json as _json
 from typing import Any
@@ -24,21 +25,14 @@ class ProcessingRecipesEndpoint:
     def __init__(self, http: httpx.Client) -> None:
         self._http = http
 
-    def list(self) -> list[RecipeSummary]:
-        request = self._http.build_request(
-            "GET", "/api/processing-recipes"
-        )
+    def list(self) -> builtins.list[RecipeSummary]:
+        request = self._http.build_request("GET", "/api/processing-recipes")
         response = send_with_error_mapping(self._http, request)
-        return [
-            RecipeSummary.model_validate(item)
-            for item in parse_json(response) or []
-        ]
+        return [RecipeSummary.model_validate(item) for item in parse_json(response) or []]
 
     def get(self, recipe_id: str, *, parse_json: bool = True) -> Any:
         """Load a recipe. Returns the parsed JSON body unless `parse_json=False`."""
-        request = self._http.build_request(
-            "GET", f"/api/processing-recipes/{recipe_id}"
-        )
+        request = self._http.build_request("GET", f"/api/processing-recipes/{recipe_id}")
         response = send_with_error_mapping(self._http, request)
         if not parse_json:
             return response.content
@@ -51,8 +45,8 @@ class ProcessingRecipesEndpoint:
         project_id: str,
         type: str,
         name: str,
-        contents: bytes | str | dict[str, Any] | list[Any],
-    ) -> list[RecipeSummary]:
+        contents: bytes | str | dict[str, Any] | builtins.list[Any],
+    ) -> builtins.list[RecipeSummary]:
         """POST a recipe. SEPAL stores the gzipped body as-is; pass either
         already-encoded bytes/str or a JSON-serializable structure that the
         client will encode for you."""
@@ -71,38 +65,25 @@ class ProcessingRecipesEndpoint:
             headers={"Content-Type": "application/gzip"},
         )
         response = send_with_error_mapping(self._http, request)
-        return [
-            RecipeSummary.model_validate(item)
-            for item in parse_json(response) or []
-        ]
+        return [RecipeSummary.model_validate(item) for item in parse_json(response) or []]
 
-    def delete(self, recipe_id: str) -> list[RecipeSummary]:
-        request = self._http.build_request(
-            "DELETE", f"/api/processing-recipes/{recipe_id}"
-        )
+    def delete(self, recipe_id: str) -> builtins.list[RecipeSummary]:
+        request = self._http.build_request("DELETE", f"/api/processing-recipes/{recipe_id}")
         response = send_with_error_mapping(self._http, request)
-        return [
-            RecipeSummary.model_validate(item)
-            for item in parse_json(response) or []
-        ]
+        return [RecipeSummary.model_validate(item) for item in parse_json(response) or []]
 
 
 class AsyncProcessingRecipesEndpoint:
     def __init__(self, http: httpx.AsyncClient) -> None:
         self._http = http
 
-    async def list(self) -> list[RecipeSummary]:
+    async def list(self) -> builtins.list[RecipeSummary]:
         request = self._http.build_request("GET", "/api/processing-recipes")
         response = await send_with_error_mapping_async(self._http, request)
-        return [
-            RecipeSummary.model_validate(item)
-            for item in parse_json(response) or []
-        ]
+        return [RecipeSummary.model_validate(item) for item in parse_json(response) or []]
 
     async def get(self, recipe_id: str, *, parse_json: bool = True) -> Any:
-        request = self._http.build_request(
-            "GET", f"/api/processing-recipes/{recipe_id}"
-        )
+        request = self._http.build_request("GET", f"/api/processing-recipes/{recipe_id}")
         response = await send_with_error_mapping_async(self._http, request)
         if not parse_json:
             return response.content
@@ -115,8 +96,8 @@ class AsyncProcessingRecipesEndpoint:
         project_id: str,
         type: str,
         name: str,
-        contents: bytes | str | dict[str, Any] | list[Any],
-    ) -> list[RecipeSummary]:
+        contents: bytes | str | dict[str, Any] | builtins.list[Any],
+    ) -> builtins.list[RecipeSummary]:
         if isinstance(contents, (dict, list)):
             raw = _json.dumps(contents).encode("utf-8")
         elif isinstance(contents, str):
@@ -132,17 +113,9 @@ class AsyncProcessingRecipesEndpoint:
             headers={"Content-Type": "application/gzip"},
         )
         response = await send_with_error_mapping_async(self._http, request)
-        return [
-            RecipeSummary.model_validate(item)
-            for item in parse_json(response) or []
-        ]
+        return [RecipeSummary.model_validate(item) for item in parse_json(response) or []]
 
-    async def delete(self, recipe_id: str) -> list[RecipeSummary]:
-        request = self._http.build_request(
-            "DELETE", f"/api/processing-recipes/{recipe_id}"
-        )
+    async def delete(self, recipe_id: str) -> builtins.list[RecipeSummary]:
+        request = self._http.build_request("DELETE", f"/api/processing-recipes/{recipe_id}")
         response = await send_with_error_mapping_async(self._http, request)
-        return [
-            RecipeSummary.model_validate(item)
-            for item in parse_json(response) or []
-        ]
+        return [RecipeSummary.model_validate(item) for item in parse_json(response) or []]

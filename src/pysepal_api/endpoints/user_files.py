@@ -11,15 +11,15 @@ Confirmed routes (v0):
 from __future__ import annotations
 
 from collections.abc import Sequence
-from pathlib import Path, PurePosixPath
-from typing import Any
+from pathlib import PurePosixPath
+from typing import Any, ClassVar
 
 import httpx
 
+from ..errors import Conflict, Forbidden
 from ..models import DirectoryListing, FileWriteResult
 from ..paths import BASE_REMOTE_PATH, normalize_list_folder, sanitize_write_path
 from ..transport import parse_json, send_with_error_mapping, send_with_error_mapping_async
-from ..errors import Conflict, Forbidden
 
 
 class UserFilesEndpoint:
@@ -56,7 +56,7 @@ class UserFilesEndpoint:
             return response.json()
         return response.content
 
-    _MIME_BY_EXT = {
+    _MIME_BY_EXT: ClassVar[dict[str, str]] = {
         ".json": "application/json",
         ".csv": "text/csv",
         ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -94,16 +94,14 @@ class UserFilesEndpoint:
         )
         try:
             response = send_with_error_mapping(self._http, request)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if isinstance(exc, Conflict):
                 return FileWriteResult()
             raise
         body = parse_json(response) or {}
         return FileWriteResult.model_validate(body)
 
-    def mkdir(
-        self, path: str, *, parents: bool = True
-    ) -> PurePosixPath:
+    def mkdir(self, path: str, *, parents: bool = True) -> PurePosixPath:
         """Create a folder under the user workspace; idempotent on 409/403."""
         relative = sanitize_write_path(path)
         request = self._http.build_request(
@@ -131,7 +129,7 @@ class AsyncUserFilesEndpoint:
     def __init__(self, http: httpx.AsyncClient) -> None:
         self._http = http
 
-    _MIME_BY_EXT = UserFilesEndpoint._MIME_BY_EXT  # share table
+    _MIME_BY_EXT: ClassVar[dict[str, str]] = UserFilesEndpoint._MIME_BY_EXT  # share table
 
     async def list(
         self,
@@ -189,9 +187,7 @@ class AsyncUserFilesEndpoint:
         body = parse_json(response) or {}
         return FileWriteResult.model_validate(body)
 
-    async def mkdir(
-        self, path: str, *, parents: bool = True
-    ) -> PurePosixPath:
+    async def mkdir(self, path: str, *, parents: bool = True) -> PurePosixPath:
         relative = sanitize_write_path(path)
         request = self._http.build_request(
             "POST",

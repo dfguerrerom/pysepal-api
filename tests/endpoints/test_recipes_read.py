@@ -36,9 +36,7 @@ def test_list_returns_summaries(http: httpx.Client) -> None:
 def test_get_parses_json_body_by_default(http: httpx.Client) -> None:
     body = {"id": "r1", "model": {"k": 1}}
     with respx.mock(base_url="https://sepal.test") as mock:
-        mock.get("/api/processing-recipes/r1").respond(
-            200, content=json.dumps(body).encode()
-        )
+        mock.get("/api/processing-recipes/r1").respond(200, content=json.dumps(body).encode())
         endpoint = ProcessingRecipesEndpoint(http)
         result = endpoint.get("r1")
         assert result == body

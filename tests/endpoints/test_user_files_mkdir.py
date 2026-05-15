@@ -46,6 +46,4 @@ def test_module_dir_creates_under_base(http: httpx.Client) -> None:
         endpoint = UserFilesEndpoint(http)
         path = endpoint.module_dir("my_app")
         assert path == PurePosixPath("/home/sepal-user/module_results/my_app")
-        assert route.calls.last.request.url.params["path"] == (
-            "module_results/my_app"
-        )
+        assert route.calls.last.request.url.params["path"] == ("module_results/my_app")

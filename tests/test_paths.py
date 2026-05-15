@@ -48,6 +48,4 @@ def test_normalize_list_folder_keeps_relative() -> None:
 
 
 def test_normalize_list_folder_strips_home() -> None:
-    assert normalize_list_folder("/home/sepal-user/module_results/app") == (
-        "module_results/app"
-    )
+    assert normalize_list_folder("/home/sepal-user/module_results/app") == ("module_results/app")

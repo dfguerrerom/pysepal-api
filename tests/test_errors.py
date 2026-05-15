@@ -4,6 +4,7 @@ from pysepal_api.errors import (
     BadRequest,
     Conflict,
     Forbidden,
+    MissingHostError,
     NoCredentialsError,
     NotFound,
     SepalApiError,
@@ -12,7 +13,6 @@ from pysepal_api.errors import (
     TaskCanceled,
     TaskFailed,
     Unauthorized,
-    MissingHostError,
     error_for_status,
 )
 

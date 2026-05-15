@@ -19,9 +19,7 @@ from typing import Any
 
 import httpx
 
-from .auth import NoAuth
 from .client import SepalClient as _ModernSepalClient
-from .errors import Forbidden
 from .paths import sanitize_write_path
 
 _DEPRECATION_MESSAGE = (
@@ -59,16 +57,12 @@ class SepalClient(_ModernSepalClient):
             verify=verify,
         )
         # Legacy attributes re-exposed for export_engine.py / FileInput / etc.
-        self.cookies = (
-            {"SEPAL-SESSIONID": session_id} if session_id else {}
-        )
+        self.cookies = {"SEPAL-SESSIONID": session_id} if session_id else {}
         self.headers = {"Accept": "application/json"}
 
     # ---- Legacy method shapes ------------------------------------------------
 
-    def list_files(
-        self, folder: str = "/", extensions: list[str] | None = None
-    ) -> dict[str, Any]:
+    def list_files(self, folder: str = "/", extensions: list[str] | None = None) -> dict[str, Any]:
         listing = self.user_files.list(folder, extensions=extensions or [])
         return listing.model_dump(by_alias=True)
 
@@ -84,9 +78,7 @@ class SepalClient(_ModernSepalClient):
         result = self.user_files.set(file_path, content, overwrite=overwrite)
         return result.model_dump(by_alias=True, exclude_none=False)
 
-    def get_remote_dir(
-        self, folder: str, parents: bool = False
-    ) -> PurePosixPath:
+    def get_remote_dir(self, folder: str, parents: bool = False) -> PurePosixPath:
         return self.user_files.mkdir(folder, parents=parents)
 
     def sanitize_path(self, file_path: str) -> PurePosixPath:

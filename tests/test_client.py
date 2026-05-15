@@ -2,7 +2,7 @@ import httpx
 import pytest
 import respx
 
-from pysepal_api.auth import ApiKeyAuth, CookieAuth, NoAuth
+from pysepal_api.auth import NoAuth
 from pysepal_api.client import SepalClient
 from pysepal_api.errors import MissingHostError
 
@@ -59,9 +59,7 @@ def test_client_creates_module_dir() -> None:
             auth=NoAuth(),
             module_name="demo",
         ) as client:
-            assert str(client.results_path) == (
-                "/home/sepal-user/module_results/demo"
-            )
+            assert str(client.results_path) == ("/home/sepal-user/module_results/demo")
 
 
 def test_client_disables_verify_for_localhost() -> None:
