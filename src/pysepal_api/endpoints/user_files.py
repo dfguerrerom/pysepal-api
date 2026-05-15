@@ -19,6 +19,7 @@ import httpx
 from ..models import DirectoryListing, FileWriteResult
 from ..paths import BASE_REMOTE_PATH, normalize_list_folder, sanitize_write_path
 from ..transport import parse_json, send_with_error_mapping
+from ..errors import Conflict
 
 
 class UserFilesEndpoint:
@@ -54,3 +55,48 @@ class UserFilesEndpoint:
         if parse_json:
             return response.json()
         return response.content
+
+    _MIME_BY_EXT = {
+        ".json": "application/json",
+        ".csv": "text/csv",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".xls": "application/vnd.ms-excel",
+        ".tif": "image/tiff",
+        ".tiff": "image/tiff",
+    }
+
+    def set(
+        self,
+        file_path: str,
+        content: str | bytes,
+        *,
+        overwrite: bool = False,
+    ) -> FileWriteResult:
+        """Upload a file via multipart/form-data. The form field is `file`.
+
+        Legacy pysepal treated a 409 on `setFile` (already exists, overwrite
+        false) as a soft success. We preserve that behavior so existing
+        notebooks keep working.
+        """
+        payload = content.encode("utf-8") if isinstance(content, str) else content
+        relative = sanitize_write_path(file_path)
+        suffix = PurePosixPath(file_path).suffix.lower()
+        mime = self._MIME_BY_EXT.get(suffix, "application/octet-stream")
+
+        request = self._http.build_request(
+            "POST",
+            "/api/user-files/setFile",
+            params={
+                "path": str(relative),
+                "overwrite": "true" if overwrite else "false",
+            },
+            files={"file": (PurePosixPath(file_path).name, payload, mime)},
+        )
+        try:
+            response = send_with_error_mapping(self._http, request)
+        except Exception as exc:  # noqa: BLE001
+            if isinstance(exc, Conflict):
+                return FileWriteResult()
+            raise
+        body = parse_json(response) or {}
+        return FileWriteResult.model_validate(body)
