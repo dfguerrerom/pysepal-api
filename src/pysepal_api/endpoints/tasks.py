@@ -12,6 +12,7 @@ Confirmed routes (v0):
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import httpx
@@ -85,3 +86,32 @@ class TasksEndpoint:
             "POST", f"/api/tasks/task/{task_id}/execute"
         )
         send_with_error_mapping(self._http, request)
+
+    def wait(
+        self,
+        task_id: str,
+        *,
+        poll: float = 5.0,
+        timeout: float | None = None,
+    ) -> Task:
+        """Poll `get(task_id)` until terminal. Raises on FAILED/CANCELED.
+
+        Terminal states: COMPLETED, FAILED, CANCELED. CANCELING is non-terminal
+        because the server has not finished the cancel handshake yet.
+        """
+        from ..errors import TaskCanceled, TaskFailed
+
+        start = time.monotonic()
+        while True:
+            task = self.get(task_id)
+            if task.state is TaskState.COMPLETED:
+                return task
+            if task.state is TaskState.FAILED:
+                raise TaskFailed(f"Task {task_id} failed: {task.status_description}")
+            if task.state is TaskState.CANCELED:
+                raise TaskCanceled(f"Task {task_id} was canceled")
+            if timeout is not None and time.monotonic() - start >= timeout:
+                raise TimeoutError(
+                    f"Task {task_id} did not reach terminal state in {timeout}s"
+                )
+            time.sleep(poll)
