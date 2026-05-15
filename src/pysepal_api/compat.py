@@ -60,7 +60,7 @@ class SepalClient(_ModernSepalClient):
         )
         # Legacy attributes re-exposed for export_engine.py / FileInput / etc.
         self.cookies = (
-            f"SEPAL-SESSIONID={session_id}" if session_id else ""
+            {"SEPAL-SESSIONID": session_id} if session_id else {}
         )
         self.headers = {"Accept": "application/json"}
 

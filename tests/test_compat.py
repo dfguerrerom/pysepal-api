@@ -35,7 +35,7 @@ def test_legacy_constructor_positional(base: str) -> None:
                 assert client.BASE_REMOTE_PATH == "/home/sepal-user"
                 assert client.module_name == "demo"
                 assert client.base_url == "https://sepal.test"
-                assert "SEPAL-SESSIONID=sid" in client.cookies
+                assert client.cookies == {"SEPAL-SESSIONID": "sid"}
                 assert client.headers["Accept"] == "application/json"
             finally:
                 client.close()
