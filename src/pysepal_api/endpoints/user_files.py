@@ -19,7 +19,7 @@ import httpx
 from ..models import DirectoryListing, FileWriteResult
 from ..paths import BASE_REMOTE_PATH, normalize_list_folder, sanitize_write_path
 from ..transport import parse_json, send_with_error_mapping
-from ..errors import Conflict
+from ..errors import Conflict, Forbidden
 
 
 class UserFilesEndpoint:
@@ -100,3 +100,28 @@ class UserFilesEndpoint:
             raise
         body = parse_json(response) or {}
         return FileWriteResult.model_validate(body)
+
+    def mkdir(
+        self, path: str, *, parents: bool = True
+    ) -> PurePosixPath:
+        """Create a folder under the user workspace; idempotent on 409/403."""
+        relative = sanitize_write_path(path)
+        request = self._http.build_request(
+            "POST",
+            "/api/user-files/createFolder",
+            params={
+                "path": str(relative),
+                "recursive": "true" if parents else "false",
+            },
+        )
+        try:
+            send_with_error_mapping(self._http, request)
+        except (Conflict, Forbidden):
+            pass
+        return relative
+
+    def module_dir(self, module_name: str) -> PurePosixPath:
+        """Create and return `/home/sepal-user/module_results/{module_name}`."""
+        relative = PurePosixPath("module_results") / module_name
+        self.mkdir(str(relative), parents=True)
+        return PurePosixPath(BASE_REMOTE_PATH) / relative
