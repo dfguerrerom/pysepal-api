@@ -1,11 +1,43 @@
+# Byte-compiled / cache
 __pycache__/
 *.py[cod]
-*.egg-info/
+*$py.class
+
+# Distribution / packaging
 build/
 dist/
+*.egg-info/
+*.egg
+wheels/
+
+# Virtual environments
 .venv/
+venv/
+env/
+
+# Tooling caches
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
 .nox/
+.tox/
+.cache/
+
+# Coverage
 .coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Env / secrets
+.env
+.env.*
+
+# Project-local notes
+HARDENING.md
