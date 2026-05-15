@@ -66,3 +66,22 @@ class TasksEndpoint:
         )
         response = send_with_error_mapping(self._http, request)
         return Task.model_validate(parse_json(response))
+
+    def cancel(self, task_id: str) -> None:
+        request = self._http.build_request(
+            "POST", f"/api/tasks/task/{task_id}/cancel"
+        )
+        send_with_error_mapping(self._http, request)
+
+    def remove(self, task_id: str) -> None:
+        request = self._http.build_request(
+            "POST", f"/api/tasks/task/{task_id}/remove"
+        )
+        send_with_error_mapping(self._http, request)
+
+    def restart(self, task_id: str) -> None:
+        """Maps to SEPAL's `execute` route."""
+        request = self._http.build_request(
+            "POST", f"/api/tasks/task/{task_id}/execute"
+        )
+        send_with_error_mapping(self._http, request)
