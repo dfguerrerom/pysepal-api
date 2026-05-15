@@ -42,3 +42,15 @@ class UserFilesEndpoint:
         )
         response = send_with_error_mapping(self._http, request)
         return DirectoryListing.model_validate(parse_json(response))
+
+    def get(self, file_path: str, *, parse_json: bool = False) -> Any:
+        """Download a file. Returns raw bytes unless `parse_json=True`."""
+        request = self._http.build_request(
+            "GET",
+            "/api/user-files/download",
+            params={"path": str(sanitize_write_path(file_path))},
+        )
+        response = send_with_error_mapping(self._http, request)
+        if parse_json:
+            return response.json()
+        return response.content
