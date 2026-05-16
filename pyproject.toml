@@ -24,6 +24,8 @@ dev = [
   "black>=24",
   "mypy>=1.10",
   "nox>=2024.4.15",
+  "commitizen>=3.29",
+  "pre-commit>=3.7",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -45,3 +47,13 @@ plugins = ["pydantic.mypy"]
 asyncio_mode = "auto"
 addopts = "-ra"
 testpaths = ["tests"]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version_provider = "pep621"
+version_files = [
+  "src/pysepal_api/__init__.py:__version__",
+]
+tag_format = "v$version"
+update_changelog_on_bump = true
+major_version_zero = true
