@@ -59,3 +59,18 @@ def test_normalize_list_folder_rejects_relative_traversal() -> None:
 def test_normalize_list_folder_rejects_absolute_traversal() -> None:
     with pytest.raises(ValueError):
         normalize_list_folder("/home/sepal-user/../../etc")
+
+
+def test_path_errors_are_pysepal_and_value_errors() -> None:
+    from pysepal_api.errors import InvalidPathError, PysepalError
+
+    for bad in ("../escape", "/etc/passwd"):
+        with pytest.raises(InvalidPathError):
+            sanitize_write_path(bad)
+        # contract: catchable via the library root AND still a ValueError
+        with pytest.raises(PysepalError):
+            sanitize_write_path(bad)
+        with pytest.raises(ValueError):
+            sanitize_write_path(bad)
+    with pytest.raises(PysepalError):
+        normalize_list_folder("../../etc")

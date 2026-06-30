@@ -131,7 +131,11 @@ class SepalClient:
             timeout=timeout,
             verify=verify,
         )
-        client._ensure_results_path()
+        try:
+            client._ensure_results_path()
+        except BaseException:
+            client.close()
+            raise
         return client
 
     def _ensure_results_path(self) -> PurePosixPath | None:
@@ -234,7 +238,11 @@ class AsyncSepalClient:
             timeout=timeout,
             verify=verify,
         )
-        await client._ensure_results_path()
+        try:
+            await client._ensure_results_path()
+        except BaseException:
+            await client.aclose()
+            raise
         return client
 
     async def _ensure_results_path(self) -> PurePosixPath | None:

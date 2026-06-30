@@ -71,6 +71,14 @@ class MissingHostError(PysepalError):
     """No SEPAL host could be detected."""
 
 
+class InvalidPathError(PysepalError, ValueError):
+    """A user-files path is outside the sandbox home or contains `..` traversal.
+
+    Subclasses `ValueError` too, so existing `except ValueError` handlers keep
+    working while the error is also catchable via the `PysepalError` root.
+    """
+
+
 class TaskError(PysepalError):
     """Base for a non-success terminal outcome of ``tasks.wait``."""
 

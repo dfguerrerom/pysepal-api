@@ -2,7 +2,7 @@ import httpx
 import pytest
 import respx
 
-from pysepal_api import NotFound, SepalClient
+from pysepal_api import NotFound, SepalClient, Unauthorized
 from pysepal_api.auth import NoAuth
 from pysepal_api.errors import MissingHostError
 
@@ -141,3 +141,21 @@ def test_verify_env_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
         assert client.verify_ssl is False
     finally:
         client.close()
+
+
+def test_create_closes_client_if_module_dir_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """create() must not leak the open httpx client when module-dir creation
+    raises (here a 401 — not swallowed by mkdir, which only eats 409/403)."""
+    closed = {"n": 0}
+    real_close = SepalClient.close
+
+    def spy(self: SepalClient) -> None:
+        closed["n"] += 1
+        real_close(self)
+
+    monkeypatch.setattr(SepalClient, "close", spy)
+    with respx.mock(base_url="https://sepal.test") as mock:
+        mock.post("/api/user-files/createFolder").respond(401, text="nope")
+        with pytest.raises(Unauthorized):
+            SepalClient.create(base_url="https://sepal.test", auth=NoAuth(), module_name="demo")
+    assert closed["n"] == 1

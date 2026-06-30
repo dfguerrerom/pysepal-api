@@ -15,13 +15,15 @@ from __future__ import annotations
 
 from pathlib import PurePosixPath
 
+from .errors import InvalidPathError
+
 BASE_REMOTE_PATH = "/home/sepal-user"
 
 
 def _reject_traversal(path: PurePosixPath, *, origin: str) -> None:
     """Raise if `path` contains a `..` component."""
     if ".." in path.parts:
-        raise ValueError(f"{origin}: path traversal detected: {path}")
+        raise InvalidPathError(f"{origin}: path traversal detected: {path}")
 
 
 def _strip_home_prefix(path: PurePosixPath, *, origin: str) -> PurePosixPath:
@@ -30,7 +32,9 @@ def _strip_home_prefix(path: PurePosixPath, *, origin: str) -> PurePosixPath:
     try:
         return path.relative_to(base)
     except ValueError:
-        raise ValueError(f"{origin}: expected absolute path under {base}, got {path}") from None
+        raise InvalidPathError(
+            f"{origin}: expected absolute path under {base}, got {path}"
+        ) from None
 
 
 def sanitize_write_path(file_path: str | PurePosixPath) -> PurePosixPath:
