@@ -6,64 +6,101 @@ Confirmed routes (v0):
 - `GET  /api/user-files/download`
 - `POST /api/user-files/setFile`
 - `POST /api/user-files/createFolder`
+
+The request/response logic for each operation lives once in the module-level
+``_*_spec`` builders and ``_parse_*`` helpers; the sync and async classes are
+thin wrappers that differ only by ``await``.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import PurePosixPath
-from typing import Any, ClassVar
-
-import httpx
+from typing import Any, Literal, overload
 
 from ..errors import Conflict, Forbidden
 from ..models import DirectoryListing, FileWriteResult
 from ..paths import BASE_REMOTE_PATH, normalize_list_folder, sanitize_write_path
-from ..transport import parse_json, send_with_error_mapping, send_with_error_mapping_async
+from ..transport import RequestSpec
+from ..transport import parse_json as _parse_json
+from ._base import _AsyncEndpoint, _SyncEndpoint
+
+_MIME_BY_EXT: dict[str, str] = {
+    ".json": "application/json",
+    ".csv": "text/csv",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".xls": "application/vnd.ms-excel",
+    ".tif": "image/tiff",
+    ".tiff": "image/tiff",
+}
 
 
-class UserFilesEndpoint:
-    def __init__(self, http: httpx.Client) -> None:
-        self._http = http
+def _list_spec(folder: str, extensions: Sequence[str] | None, include_hidden: bool) -> RequestSpec:
+    return RequestSpec(
+        "GET",
+        "/api/user-files/listFiles",
+        params={
+            "path": normalize_list_folder(folder),
+            "extensions": ",".join(extensions or []),
+            "includeHidden": "true" if include_hidden else "false",
+        },
+    )
 
+
+def _download_spec(file_path: str) -> RequestSpec:
+    return RequestSpec(
+        "GET",
+        "/api/user-files/download",
+        params={"path": str(sanitize_write_path(file_path))},
+    )
+
+
+def _set_spec(file_path: str, content: str | bytes, overwrite: bool) -> RequestSpec:
+    payload = content.encode("utf-8") if isinstance(content, str) else content
+    relative = sanitize_write_path(file_path)
+    mime = _MIME_BY_EXT.get(PurePosixPath(file_path).suffix.lower(), "application/octet-stream")
+    return RequestSpec(
+        "POST",
+        "/api/user-files/setFile",
+        params={"path": str(relative), "overwrite": "true" if overwrite else "false"},
+        files={"file": (PurePosixPath(file_path).name, payload, mime)},
+    )
+
+
+def _mkdir_spec(path: str, parents: bool) -> RequestSpec:
+    return RequestSpec(
+        "POST",
+        "/api/user-files/createFolder",
+        params={
+            "path": str(sanitize_write_path(path)),
+            "recursive": "true" if parents else "false",
+        },
+    )
+
+
+def _module_dir_relative(module_name: str) -> PurePosixPath:
+    return PurePosixPath("module_results") / module_name
+
+
+class UserFilesEndpoint(_SyncEndpoint):
     def list(
         self,
         folder: str = ".",
         extensions: Sequence[str] | None = None,
         include_hidden: bool = False,
     ) -> DirectoryListing:
-        request = self._http.build_request(
-            "GET",
-            "/api/user-files/listFiles",
-            params={
-                "path": normalize_list_folder(folder),
-                "extensions": ",".join(extensions or []),
-                "includeHidden": "true" if include_hidden else "false",
-            },
-        )
-        response = send_with_error_mapping(self._http, request)
-        return DirectoryListing.model_validate(parse_json(response))
+        resp = self._send(_list_spec(folder, extensions, include_hidden))
+        return DirectoryListing.model_validate(_parse_json(resp))
+
+    @overload
+    def get(self, file_path: str, *, parse_json: Literal[False] = False) -> bytes: ...
+    @overload
+    def get(self, file_path: str, *, parse_json: Literal[True]) -> Any: ...
 
     def get(self, file_path: str, *, parse_json: bool = False) -> Any:
         """Download a file. Returns raw bytes unless `parse_json=True`."""
-        request = self._http.build_request(
-            "GET",
-            "/api/user-files/download",
-            params={"path": str(sanitize_write_path(file_path))},
-        )
-        response = send_with_error_mapping(self._http, request)
-        if parse_json:
-            return response.json()
-        return response.content
-
-    _MIME_BY_EXT: ClassVar[dict[str, str]] = {
-        ".json": "application/json",
-        ".csv": "text/csv",
-        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        ".xls": "application/vnd.ms-excel",
-        ".tif": "image/tiff",
-        ".tiff": "image/tiff",
-    }
+        resp = self._send(_download_spec(file_path))
+        return resp.json() if parse_json else resp.content
 
     def set(
         self,
@@ -74,91 +111,54 @@ class UserFilesEndpoint:
     ) -> FileWriteResult:
         """Upload a file via multipart/form-data. The form field is `file`.
 
-        Legacy pysepal treated a 409 on `setFile` (already exists, overwrite
-        false) as a soft success. We preserve that behavior so existing
-        notebooks keep working.
+        SEPAL returns 409 on `setFile` when the file exists and `overwrite` is
+        false; legacy pysepal treated that as a soft success and so do we — an
+        empty `FileWriteResult` is returned.
         """
-        payload = content.encode("utf-8") if isinstance(content, str) else content
-        relative = sanitize_write_path(file_path)
-        suffix = PurePosixPath(file_path).suffix.lower()
-        mime = self._MIME_BY_EXT.get(suffix, "application/octet-stream")
-
-        request = self._http.build_request(
-            "POST",
-            "/api/user-files/setFile",
-            params={
-                "path": str(relative),
-                "overwrite": "true" if overwrite else "false",
-            },
-            files={"file": (PurePosixPath(file_path).name, payload, mime)},
-        )
         try:
-            response = send_with_error_mapping(self._http, request)
-        except Exception as exc:
-            if isinstance(exc, Conflict):
-                return FileWriteResult()
-            raise
-        body = parse_json(response) or {}
-        return FileWriteResult.model_validate(body)
+            resp = self._send(_set_spec(file_path, content, overwrite))
+        except Conflict:
+            return FileWriteResult()
+        return FileWriteResult.model_validate(_parse_json(resp) or {})
 
     def mkdir(self, path: str, *, parents: bool = True) -> PurePosixPath:
-        """Create a folder under the user workspace; idempotent on 409/403."""
+        """Create a folder under the user workspace; idempotent on 409/403.
+
+        SEPAL returns 403 (not 409) for an already-existing folder in some
+        deployments, so both are swallowed to keep `mkdir` idempotent.
+        """
         relative = sanitize_write_path(path)
-        request = self._http.build_request(
-            "POST",
-            "/api/user-files/createFolder",
-            params={
-                "path": str(relative),
-                "recursive": "true" if parents else "false",
-            },
-        )
         try:
-            send_with_error_mapping(self._http, request)
+            self._send(_mkdir_spec(path, parents))
         except (Conflict, Forbidden):
             pass
         return relative
 
     def module_dir(self, module_name: str) -> PurePosixPath:
         """Create and return `/home/sepal-user/module_results/{module_name}`."""
-        relative = PurePosixPath("module_results") / module_name
+        relative = _module_dir_relative(module_name)
         self.mkdir(str(relative), parents=True)
         return PurePosixPath(BASE_REMOTE_PATH) / relative
 
 
-class AsyncUserFilesEndpoint:
-    def __init__(self, http: httpx.AsyncClient) -> None:
-        self._http = http
-
-    _MIME_BY_EXT: ClassVar[dict[str, str]] = UserFilesEndpoint._MIME_BY_EXT  # share table
-
+class AsyncUserFilesEndpoint(_AsyncEndpoint):
     async def list(
         self,
         folder: str = ".",
         extensions: Sequence[str] | None = None,
         include_hidden: bool = False,
     ) -> DirectoryListing:
-        request = self._http.build_request(
-            "GET",
-            "/api/user-files/listFiles",
-            params={
-                "path": normalize_list_folder(folder),
-                "extensions": ",".join(extensions or []),
-                "includeHidden": "true" if include_hidden else "false",
-            },
-        )
-        response = await send_with_error_mapping_async(self._http, request)
-        return DirectoryListing.model_validate(parse_json(response))
+        resp = await self._send(_list_spec(folder, extensions, include_hidden))
+        return DirectoryListing.model_validate(_parse_json(resp))
+
+    @overload
+    async def get(self, file_path: str, *, parse_json: Literal[False] = False) -> bytes: ...
+    @overload
+    async def get(self, file_path: str, *, parse_json: Literal[True]) -> Any: ...
 
     async def get(self, file_path: str, *, parse_json: bool = False) -> Any:
-        request = self._http.build_request(
-            "GET",
-            "/api/user-files/download",
-            params={"path": str(sanitize_write_path(file_path))},
-        )
-        response = await send_with_error_mapping_async(self._http, request)
-        if parse_json:
-            return response.json()
-        return response.content
+        resp = await self._send(_download_spec(file_path))
+        return resp.json() if parse_json else resp.content
 
     async def set(
         self,
@@ -167,43 +167,21 @@ class AsyncUserFilesEndpoint:
         *,
         overwrite: bool = False,
     ) -> FileWriteResult:
-        payload = content.encode("utf-8") if isinstance(content, str) else content
-        relative = sanitize_write_path(file_path)
-        suffix = PurePosixPath(file_path).suffix.lower()
-        mime = self._MIME_BY_EXT.get(suffix, "application/octet-stream")
-        request = self._http.build_request(
-            "POST",
-            "/api/user-files/setFile",
-            params={
-                "path": str(relative),
-                "overwrite": "true" if overwrite else "false",
-            },
-            files={"file": (PurePosixPath(file_path).name, payload, mime)},
-        )
         try:
-            response = await send_with_error_mapping_async(self._http, request)
+            resp = await self._send(_set_spec(file_path, content, overwrite))
         except Conflict:
             return FileWriteResult()
-        body = parse_json(response) or {}
-        return FileWriteResult.model_validate(body)
+        return FileWriteResult.model_validate(_parse_json(resp) or {})
 
     async def mkdir(self, path: str, *, parents: bool = True) -> PurePosixPath:
         relative = sanitize_write_path(path)
-        request = self._http.build_request(
-            "POST",
-            "/api/user-files/createFolder",
-            params={
-                "path": str(relative),
-                "recursive": "true" if parents else "false",
-            },
-        )
         try:
-            await send_with_error_mapping_async(self._http, request)
+            await self._send(_mkdir_spec(path, parents))
         except (Conflict, Forbidden):
             pass
         return relative
 
     async def module_dir(self, module_name: str) -> PurePosixPath:
-        relative = PurePosixPath("module_results") / module_name
+        relative = _module_dir_relative(module_name)
         await self.mkdir(str(relative), parents=True)
         return PurePosixPath(BASE_REMOTE_PATH) / relative

@@ -49,3 +49,13 @@ def test_normalize_list_folder_keeps_relative() -> None:
 
 def test_normalize_list_folder_strips_home() -> None:
     assert normalize_list_folder("/home/sepal-user/module_results/app") == ("module_results/app")
+
+
+def test_normalize_list_folder_rejects_relative_traversal() -> None:
+    with pytest.raises(ValueError):
+        normalize_list_folder("../../etc")
+
+
+def test_normalize_list_folder_rejects_absolute_traversal() -> None:
+    with pytest.raises(ValueError):
+        normalize_list_folder("/home/sepal-user/../../etc")
