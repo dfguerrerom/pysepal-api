@@ -17,11 +17,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypeVar
 
 import httpx
+from pydantic import BaseModel, ValidationError
 
-from .errors import SepalTransportError, error_for_status
+from .errors import ResponseError, SepalTransportError, error_for_status
+
+_M = TypeVar("_M", bound=BaseModel)
 
 
 @dataclass(frozen=True)
@@ -57,10 +60,40 @@ def _safe_url(request: httpx.Request) -> str:
 
 
 def parse_json(response: httpx.Response) -> Any:
-    """Parse a JSON response body. Empty body returns None."""
+    """Parse a JSON response body. Empty body returns None.
+
+    Malformed JSON is re-raised as a typed `ResponseError` so callers only ever
+    see `PysepalError` from the library.
+    """
     if not response.content:
         return None
-    return response.json()
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise ResponseError("malformed JSON in SEPAL response") from exc
+
+
+def parse_one(response: httpx.Response, model: type[_M], *, default: Any = None) -> _M:
+    """Parse a single-object JSON response and validate it into `model`.
+
+    `default` is used when the body is empty (e.g. `{}` for a loose result).
+    Validation failures surface as `ResponseError`.
+    """
+    data = parse_json(response)
+    if data is None and default is not None:
+        data = default
+    try:
+        return model.model_validate(data)
+    except ValidationError as exc:
+        raise ResponseError(f"unexpected {model.__name__} response shape") from exc
+
+
+def parse_many(response: httpx.Response, model: type[_M]) -> list[_M]:
+    """Parse a JSON array response and validate each item into `model`."""
+    try:
+        return [model.model_validate(item) for item in parse_json(response) or []]
+    except ValidationError as exc:
+        raise ResponseError(f"unexpected {model.__name__} list response shape") from exc
 
 
 def _body_for_error(response: httpx.Response) -> Any:

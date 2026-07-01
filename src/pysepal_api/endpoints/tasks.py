@@ -18,8 +18,7 @@ from typing import Any
 
 from ..errors import TaskCanceled, TaskFailed, TaskTimeout
 from ..models import Task, TaskState
-from ..transport import RequestSpec
-from ..transport import parse_json as _parse_json
+from ..transport import RequestSpec, parse_many, parse_one
 from ._base import _AsyncEndpoint, _SyncEndpoint
 
 
@@ -87,7 +86,7 @@ class TasksEndpoint(_SyncEndpoint):
         instance_type: str | None = None,
     ) -> Task:
         resp = self._send(_submit_spec(operation, params, recipe_id, instance_type))
-        return Task.model_validate(_parse_json(resp))
+        return parse_one(resp, Task)
 
     def list(
         self,
@@ -97,11 +96,11 @@ class TasksEndpoint(_SyncEndpoint):
         destination: str | None = None,
     ) -> list[Task]:
         resp = self._send(_list_spec(status, output_path, destination))
-        return [Task.model_validate(item) for item in _parse_json(resp) or []]
+        return parse_many(resp, Task)
 
     def get(self, task_id: str, *, details: bool = False) -> Task:
         resp = self._send(_get_spec(task_id, details))
-        return Task.model_validate(_parse_json(resp))
+        return parse_one(resp, Task)
 
     def cancel(self, task_id: str) -> None:
         self._send(_action_spec(task_id, "cancel"))
@@ -135,7 +134,7 @@ class AsyncTasksEndpoint(_AsyncEndpoint):
         instance_type: str | None = None,
     ) -> Task:
         resp = await self._send(_submit_spec(operation, params, recipe_id, instance_type))
-        return Task.model_validate(_parse_json(resp))
+        return parse_one(resp, Task)
 
     async def list(
         self,
@@ -145,11 +144,11 @@ class AsyncTasksEndpoint(_AsyncEndpoint):
         destination: str | None = None,
     ) -> list[Task]:
         resp = await self._send(_list_spec(status, output_path, destination))
-        return [Task.model_validate(item) for item in _parse_json(resp) or []]
+        return parse_many(resp, Task)
 
     async def get(self, task_id: str, *, details: bool = False) -> Task:
         resp = await self._send(_get_spec(task_id, details))
-        return Task.model_validate(_parse_json(resp))
+        return parse_one(resp, Task)
 
     async def cancel(self, task_id: str) -> None:
         await self._send(_action_spec(task_id, "cancel"))

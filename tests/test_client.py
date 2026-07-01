@@ -159,3 +159,24 @@ def test_create_closes_client_if_module_dir_fails(monkeypatch: pytest.MonkeyPatc
         with pytest.raises(Unauthorized):
             SepalClient.create(base_url="https://sepal.test", auth=NoAuth(), module_name="demo")
     assert closed["n"] == 1
+
+
+def test_context_manager_closes_client_if_module_dir_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Same leak guard as create(), but via the `with` path — __exit__ is never
+    called when __enter__ raises, so __enter__ must close on failure itself."""
+    closed = {"n": 0}
+    real_close = SepalClient.close
+
+    def spy(self: SepalClient) -> None:
+        closed["n"] += 1
+        real_close(self)
+
+    monkeypatch.setattr(SepalClient, "close", spy)
+    with respx.mock(base_url="https://sepal.test") as mock:
+        mock.post("/api/user-files/createFolder").respond(401, text="nope")
+        with pytest.raises(Unauthorized):
+            with SepalClient(base_url="https://sepal.test", auth=NoAuth(), module_name="demo"):
+                pass
+    assert closed["n"] == 1

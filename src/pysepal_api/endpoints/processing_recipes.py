@@ -15,7 +15,7 @@ import json
 from typing import Any, Literal, overload
 
 from ..models import RecipeSummary
-from ..transport import RequestSpec
+from ..transport import RequestSpec, parse_many
 from ..transport import parse_json as _parse_json
 from ._base import _AsyncEndpoint, _SyncEndpoint
 
@@ -48,7 +48,7 @@ def _save_spec(
 
 
 def _summaries(resp: Any) -> RecipeSummaries:
-    return [RecipeSummary.model_validate(item) for item in _parse_json(resp) or []]
+    return parse_many(resp, RecipeSummary)
 
 
 class ProcessingRecipesEndpoint(_SyncEndpoint):
@@ -63,7 +63,7 @@ class ProcessingRecipesEndpoint(_SyncEndpoint):
     def get(self, recipe_id: str, *, parse_json: bool = True) -> Any:
         """Load a recipe. Returns the parsed JSON body unless `parse_json=False`."""
         resp = self._send(RequestSpec("GET", f"/api/processing-recipes/{recipe_id}"))
-        return resp.json() if parse_json else resp.content
+        return _parse_json(resp) if parse_json else resp.content
 
     def save(
         self,
@@ -94,7 +94,7 @@ class AsyncProcessingRecipesEndpoint(_AsyncEndpoint):
 
     async def get(self, recipe_id: str, *, parse_json: bool = True) -> Any:
         resp = await self._send(RequestSpec("GET", f"/api/processing-recipes/{recipe_id}"))
-        return resp.json() if parse_json else resp.content
+        return _parse_json(resp) if parse_json else resp.content
 
     async def save(
         self,

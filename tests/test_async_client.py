@@ -77,3 +77,25 @@ async def test_async_create_closes_client_if_module_dir_fails(
                 base_url="https://sepal.test", auth=NoAuth(), module_name="demo"
             )
     assert closed["n"] == 1
+
+
+@pytest.mark.asyncio
+async def test_async_context_manager_closes_client_if_module_dir_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    closed = {"n": 0}
+    real_aclose = AsyncSepalClient.aclose
+
+    async def spy(self: AsyncSepalClient) -> None:
+        closed["n"] += 1
+        await real_aclose(self)
+
+    monkeypatch.setattr(AsyncSepalClient, "aclose", spy)
+    with respx.mock(base_url="https://sepal.test") as mock:
+        mock.post("/api/user-files/createFolder").respond(401, text="nope")
+        with pytest.raises(Unauthorized):
+            async with AsyncSepalClient(
+                base_url="https://sepal.test", auth=NoAuth(), module_name="demo"
+            ):
+                pass
+    assert closed["n"] == 1

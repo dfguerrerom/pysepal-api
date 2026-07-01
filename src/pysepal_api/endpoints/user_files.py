@@ -21,7 +21,7 @@ from typing import Any, Literal, overload
 from ..errors import Conflict, Forbidden
 from ..models import DirectoryListing, FileWriteResult
 from ..paths import BASE_REMOTE_PATH, normalize_list_folder, sanitize_write_path
-from ..transport import RequestSpec
+from ..transport import RequestSpec, parse_one
 from ..transport import parse_json as _parse_json
 from ._base import _AsyncEndpoint, _SyncEndpoint
 
@@ -90,7 +90,7 @@ class UserFilesEndpoint(_SyncEndpoint):
         include_hidden: bool = False,
     ) -> DirectoryListing:
         resp = self._send(_list_spec(folder, extensions, include_hidden))
-        return DirectoryListing.model_validate(_parse_json(resp))
+        return parse_one(resp, DirectoryListing)
 
     @overload
     def get(self, file_path: str, *, parse_json: Literal[False] = False) -> bytes: ...
@@ -100,7 +100,7 @@ class UserFilesEndpoint(_SyncEndpoint):
     def get(self, file_path: str, *, parse_json: bool = False) -> Any:
         """Download a file. Returns raw bytes unless `parse_json=True`."""
         resp = self._send(_download_spec(file_path))
-        return resp.json() if parse_json else resp.content
+        return _parse_json(resp) if parse_json else resp.content
 
     def set(
         self,
@@ -119,7 +119,7 @@ class UserFilesEndpoint(_SyncEndpoint):
             resp = self._send(_set_spec(file_path, content, overwrite))
         except Conflict:
             return FileWriteResult()
-        return FileWriteResult.model_validate(_parse_json(resp) or {})
+        return parse_one(resp, FileWriteResult, default={})
 
     def mkdir(self, path: str, *, parents: bool = True) -> PurePosixPath:
         """Create a folder under the user workspace; idempotent on 409/403.
@@ -149,7 +149,7 @@ class AsyncUserFilesEndpoint(_AsyncEndpoint):
         include_hidden: bool = False,
     ) -> DirectoryListing:
         resp = await self._send(_list_spec(folder, extensions, include_hidden))
-        return DirectoryListing.model_validate(_parse_json(resp))
+        return parse_one(resp, DirectoryListing)
 
     @overload
     async def get(self, file_path: str, *, parse_json: Literal[False] = False) -> bytes: ...
@@ -158,7 +158,7 @@ class AsyncUserFilesEndpoint(_AsyncEndpoint):
 
     async def get(self, file_path: str, *, parse_json: bool = False) -> Any:
         resp = await self._send(_download_spec(file_path))
-        return resp.json() if parse_json else resp.content
+        return _parse_json(resp) if parse_json else resp.content
 
     async def set(
         self,
@@ -171,7 +171,7 @@ class AsyncUserFilesEndpoint(_AsyncEndpoint):
             resp = await self._send(_set_spec(file_path, content, overwrite))
         except Conflict:
             return FileWriteResult()
-        return FileWriteResult.model_validate(_parse_json(resp) or {})
+        return parse_one(resp, FileWriteResult, default={})
 
     async def mkdir(self, path: str, *, parents: bool = True) -> PurePosixPath:
         relative = sanitize_write_path(path)

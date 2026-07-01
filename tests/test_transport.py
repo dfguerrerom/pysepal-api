@@ -66,3 +66,24 @@ def test_send_maps_transport_error() -> None:
             req = c.build_request("GET", "/boom")
             with pytest.raises(SepalTransportError):
                 send_with_error_mapping(c, req)
+
+
+def test_parse_json_wraps_malformed_body() -> None:
+    from pysepal_api.errors import PysepalError, ResponseError
+
+    resp = httpx.Response(200, content=b"not json", headers={"content-type": "application/json"})
+    with pytest.raises(ResponseError):
+        parse_json(resp)
+    # contract: a malformed response is catchable via the library root
+    with pytest.raises(PysepalError):
+        parse_json(resp)
+
+
+def test_parse_one_wraps_validation_error() -> None:
+    from pysepal_api.errors import PysepalError
+    from pysepal_api.models import Task
+    from pysepal_api.transport import parse_one
+
+    resp = httpx.Response(200, json={"missing": "fields"})
+    with pytest.raises(PysepalError):
+        parse_one(resp, Task)

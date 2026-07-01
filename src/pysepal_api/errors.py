@@ -63,6 +63,14 @@ class SepalTransportError(PysepalError):
     """Network/send failure: DNS, connection, timeout, etc."""
 
 
+class ResponseError(PysepalError):
+    """A SEPAL response could not be parsed or did not match the expected shape.
+
+    Wraps malformed JSON (`json.JSONDecodeError`) and pydantic `ValidationError`
+    from response parsing; the underlying cause is available via `__cause__`.
+    """
+
+
 class NoCredentialsError(PysepalError):
     """No usable auth could be detected."""
 

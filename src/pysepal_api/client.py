@@ -170,7 +170,11 @@ class SepalClient:
         self._http.close()
 
     def __enter__(self) -> SepalClient:
-        self._ensure_results_path()
+        try:
+            self._ensure_results_path()
+        except BaseException:
+            self.close()
+            raise
         return self
 
     def __exit__(self, *exc: Any) -> None:
@@ -272,7 +276,11 @@ class AsyncSepalClient:
         await self._http.aclose()
 
     async def __aenter__(self) -> AsyncSepalClient:
-        await self._ensure_results_path()
+        try:
+            await self._ensure_results_path()
+        except BaseException:
+            await self.aclose()
+            raise
         return self
 
     async def __aexit__(self, *exc: Any) -> None:
