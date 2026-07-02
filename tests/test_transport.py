@@ -87,3 +87,22 @@ def test_parse_one_wraps_validation_error() -> None:
     resp = httpx.Response(200, json={"missing": "fields"})
     with pytest.raises(PysepalError):
         parse_one(resp, Task)
+
+
+def test_parse_many_wraps_non_array_body() -> None:
+    from pysepal_api.errors import PysepalError
+    from pysepal_api.models import RecipeSummary
+    from pysepal_api.transport import parse_many
+
+    # a scalar body would raise a raw TypeError at iteration without the guard
+    for body in (1, True, {"not": "a list"}):
+        with pytest.raises(PysepalError):
+            parse_many(httpx.Response(200, json=body), RecipeSummary)
+
+
+def test_parse_many_empty_body_is_empty_list() -> None:
+    from pysepal_api.models import RecipeSummary
+    from pysepal_api.transport import parse_many
+
+    assert parse_many(httpx.Response(200, content=b""), RecipeSummary) == []
+    assert parse_many(httpx.Response(200, json=[]), RecipeSummary) == []

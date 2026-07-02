@@ -89,9 +89,20 @@ def parse_one(response: httpx.Response, model: type[_M], *, default: Any = None)
 
 
 def parse_many(response: httpx.Response, model: type[_M]) -> list[_M]:
-    """Parse a JSON array response and validate each item into `model`."""
+    """Parse a JSON array response and validate each item into `model`.
+
+    An empty body is treated as an empty list; any non-array body raises a
+    typed `ResponseError` (rather than a raw `TypeError` from iterating a scalar).
+    """
+    data = parse_json(response)
+    if data is None:
+        return []
+    if not isinstance(data, list):
+        raise ResponseError(
+            f"expected a JSON array for {model.__name__}, got {type(data).__name__}"
+        )
     try:
-        return [model.model_validate(item) for item in parse_json(response) or []]
+        return [model.model_validate(item) for item in data]
     except ValidationError as exc:
         raise ResponseError(f"unexpected {model.__name__} list response shape") from exc
 
