@@ -1,10 +1,15 @@
 """Error types raised by pysepal-api.
 
-Two roots:
+Every exception the library raises derives from a single root, ``PysepalError``,
+so a caller can ``except PysepalError`` to catch *anything* this library throws.
+Beneath that root:
 
-- `SepalApiError` for non-2xx HTTP responses from SEPAL.
-- Standalone exceptions for non-HTTP problems (transport, missing config,
-  failed tasks).
+- ``SepalApiError`` (and its status-specific subclasses) for non-2xx HTTP
+  responses from a SEPAL service.
+- ``SepalTransportError`` / ``NoCredentialsError`` / ``MissingHostError`` for
+  non-HTTP problems (network, missing config).
+- ``TaskError`` (``TaskFailed`` / ``TaskCanceled`` / ``TaskTimeout``) for the
+  terminal outcomes of ``tasks.wait``.
 """
 
 from __future__ import annotations
@@ -12,7 +17,11 @@ from __future__ import annotations
 from typing import Any
 
 
-class SepalApiError(Exception):
+class PysepalError(Exception):
+    """Root of every exception raised by pysepal-api."""
+
+
+class SepalApiError(PysepalError):
     """Base for non-2xx responses from a SEPAL service."""
 
     def __init__(self, status_code: int, *, url: str, body: Any = None) -> None:
@@ -42,28 +51,60 @@ class Conflict(SepalApiError):
     pass
 
 
+class TooManyRequests(SepalApiError):
+    """429 — rate limited. Distinct so callers can back off programmatically."""
+
+
 class ServerError(SepalApiError):
     pass
 
 
-class SepalTransportError(Exception):
+class SepalTransportError(PysepalError):
     """Network/send failure: DNS, connection, timeout, etc."""
 
 
-class NoCredentialsError(Exception):
+class ResponseError(PysepalError):
+    """A SEPAL response could not be parsed or did not match the expected shape.
+
+    Wraps malformed JSON (`json.JSONDecodeError`) and pydantic `ValidationError`
+    from response parsing; the underlying cause is available via `__cause__`.
+    """
+
+
+class NoCredentialsError(PysepalError):
     """No usable auth could be detected."""
 
 
-class MissingHostError(Exception):
+class MissingHostError(PysepalError):
     """No SEPAL host could be detected."""
 
 
-class TaskFailed(Exception):
+class InvalidPathError(PysepalError, ValueError):
+    """A user-files path is outside the sandbox home or contains `..` traversal.
+
+    Subclasses `ValueError` too, so existing `except ValueError` handlers keep
+    working while the error is also catchable via the `PysepalError` root.
+    """
+
+
+class TaskError(PysepalError):
+    """Base for a non-success terminal outcome of ``tasks.wait``."""
+
+
+class TaskFailed(TaskError):
     """Raised by tasks.wait when a task reaches FAILED."""
 
 
-class TaskCanceled(Exception):
+class TaskCanceled(TaskError):
     """Raised by tasks.wait when a task reaches CANCELED."""
+
+
+class TaskTimeout(TaskError, TimeoutError):
+    """Raised by tasks.wait when a task does not reach a terminal state in time.
+
+    Subclasses the builtin ``TimeoutError`` too, so ``except TimeoutError`` keeps
+    working alongside ``except TaskError`` / ``except PysepalError``.
+    """
 
 
 _BY_STATUS: dict[int, type[SepalApiError]] = {
@@ -72,6 +113,7 @@ _BY_STATUS: dict[int, type[SepalApiError]] = {
     403: Forbidden,
     404: NotFound,
     409: Conflict,
+    429: TooManyRequests,
 }
 
 

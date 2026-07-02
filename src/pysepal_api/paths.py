@@ -5,17 +5,40 @@ sandbox user's home (`/home/sepal-user`). pysepal callers historically pass
 either absolute paths under that home or already-relative paths; both must
 work transparently. The listing endpoint additionally accepts `"/"` as a
 shortcut for the workspace root, which the server understands as `"."`.
+
+All routes — read, write, create, *and* list — enforce the same sandbox
+confinement: absolute paths must live under `/home/sepal-user`, and `..`
+traversal is rejected everywhere via the shared `_reject_traversal` helper.
 """
 
 from __future__ import annotations
 
 from pathlib import PurePosixPath
 
+from .errors import InvalidPathError
+
 BASE_REMOTE_PATH = "/home/sepal-user"
 
 
+def _reject_traversal(path: PurePosixPath, *, origin: str) -> None:
+    """Raise if `path` contains a `..` component."""
+    if ".." in path.parts:
+        raise InvalidPathError(f"{origin}: path traversal detected: {path}")
+
+
+def _strip_home_prefix(path: PurePosixPath, *, origin: str) -> PurePosixPath:
+    """Strip the `/home/sepal-user` prefix from an absolute path, or reject it."""
+    base = PurePosixPath(BASE_REMOTE_PATH)
+    try:
+        return path.relative_to(base)
+    except ValueError:
+        raise InvalidPathError(
+            f"{origin}: expected absolute path under {base}, got {path}"
+        ) from None
+
+
 def sanitize_write_path(file_path: str | PurePosixPath) -> PurePosixPath:
-    """Sanitize a path for write/create endpoints.
+    """Sanitize a path for download/write/create endpoints.
 
     Rules:
     - Absolute paths must live under `/home/sepal-user`; the prefix is stripped.
@@ -24,21 +47,11 @@ def sanitize_write_path(file_path: str | PurePosixPath) -> PurePosixPath:
     - Anything else absolute is rejected.
     """
     p = PurePosixPath(str(file_path))
-    base = PurePosixPath(BASE_REMOTE_PATH)
-
     if p.is_absolute():
-        try:
-            rel = p.relative_to(base)
-        except ValueError:
-            raise ValueError(
-                f"sanitize_write_path: expected absolute path under {base}, got {p}"
-            ) from None
-        if ".." in rel.parts:
-            raise ValueError(f"sanitize_write_path: path traversal detected: {p}")
+        rel = _strip_home_prefix(p, origin="sanitize_write_path")
+        _reject_traversal(rel, origin="sanitize_write_path")
         return rel
-
-    if ".." in p.parts:
-        raise ValueError(f"sanitize_write_path: path traversal detected: {p}")
+    _reject_traversal(p, origin="sanitize_write_path")
     return p
 
 
@@ -47,19 +60,16 @@ def normalize_list_folder(folder: str | PurePosixPath) -> str:
 
     `/` is treated as a pysepal compatibility alias for the workspace root and
     becomes `"."`. Absolute paths under `/home/sepal-user` are stripped to
-    relative form. Relative paths pass through.
+    relative form. Relative paths pass through. `..` traversal is rejected, so
+    listing enforces the same sandbox confinement as the write/read routes.
     """
     s = str(folder)
     if s in ("", "/"):
         return "."
     p = PurePosixPath(s)
-    base = PurePosixPath(BASE_REMOTE_PATH)
     if p.is_absolute():
-        try:
-            rel = p.relative_to(base)
-        except ValueError:
-            raise ValueError(
-                f"normalize_list_folder: expected absolute path under {base}, got {p}"
-            ) from None
+        rel = _strip_home_prefix(p, origin="normalize_list_folder")
+        _reject_traversal(rel, origin="normalize_list_folder")
         return str(rel) or "."
+    _reject_traversal(p, origin="normalize_list_folder")
     return s
