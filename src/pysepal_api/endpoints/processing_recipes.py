@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import gzip
 import json
-from typing import Any, Literal, overload
+from typing import Any
 
 from ..models import RecipeSummary
 from ..transport import RequestSpec, parse_many
@@ -55,15 +55,13 @@ class ProcessingRecipesEndpoint(_SyncEndpoint):
     def list(self) -> RecipeSummaries:
         return _summaries(self._send(RequestSpec("GET", "/api/processing-recipes")))
 
-    @overload
-    def get(self, recipe_id: str, *, parse_json: Literal[True] = True) -> Any: ...
-    @overload
-    def get(self, recipe_id: str, *, parse_json: Literal[False]) -> bytes: ...
+    def get(self, recipe_id: str) -> Any:
+        """Load a recipe as parsed JSON. Use `get_raw` for the exact bytes."""
+        return _parse_json(self._send(RequestSpec("GET", f"/api/processing-recipes/{recipe_id}")))
 
-    def get(self, recipe_id: str, *, parse_json: bool = True) -> Any:
-        """Load a recipe. Returns the parsed JSON body unless `parse_json=False`."""
-        resp = self._send(RequestSpec("GET", f"/api/processing-recipes/{recipe_id}"))
-        return _parse_json(resp) if parse_json else resp.content
+    def get_raw(self, recipe_id: str) -> bytes:
+        """Load a recipe body exactly as stored, without JSON parsing."""
+        return self._send(RequestSpec("GET", f"/api/processing-recipes/{recipe_id}")).content
 
     def save(
         self,
@@ -87,14 +85,14 @@ class AsyncProcessingRecipesEndpoint(_AsyncEndpoint):
     async def list(self) -> RecipeSummaries:
         return _summaries(await self._send(RequestSpec("GET", "/api/processing-recipes")))
 
-    @overload
-    async def get(self, recipe_id: str, *, parse_json: Literal[True] = True) -> Any: ...
-    @overload
-    async def get(self, recipe_id: str, *, parse_json: Literal[False]) -> bytes: ...
+    async def get(self, recipe_id: str) -> Any:
+        return _parse_json(
+            await self._send(RequestSpec("GET", f"/api/processing-recipes/{recipe_id}"))
+        )
 
-    async def get(self, recipe_id: str, *, parse_json: bool = True) -> Any:
+    async def get_raw(self, recipe_id: str) -> bytes:
         resp = await self._send(RequestSpec("GET", f"/api/processing-recipes/{recipe_id}"))
-        return _parse_json(resp) if parse_json else resp.content
+        return resp.content
 
     async def save(
         self,

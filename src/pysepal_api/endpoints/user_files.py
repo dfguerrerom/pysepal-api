@@ -10,13 +10,16 @@ Confirmed routes (v0):
 The request/response logic for each operation lives once in the module-level
 ``_*_spec`` builders and ``_parse_*`` helpers; the sync and async classes are
 thin wrappers that differ only by ``await``.
+
+Method names follow `pathlib` conventions: `read_bytes` / `read_text` /
+`read_json` for downloads, `write` for uploads, `mkdir` for folders.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import PurePosixPath
-from typing import Any, Literal, overload
+from typing import Any
 
 from ..errors import Conflict, Forbidden
 from ..models import DirectoryListing, FileWriteResult
@@ -55,7 +58,7 @@ def _download_spec(file_path: str) -> RequestSpec:
     )
 
 
-def _set_spec(file_path: str, content: str | bytes, overwrite: bool) -> RequestSpec:
+def _write_spec(file_path: str, content: str | bytes, overwrite: bool) -> RequestSpec:
     payload = content.encode("utf-8") if isinstance(content, str) else content
     relative = sanitize_write_path(file_path)
     mime = _MIME_BY_EXT.get(PurePosixPath(file_path).suffix.lower(), "application/octet-stream")
@@ -86,46 +89,46 @@ class UserFilesEndpoint(_SyncEndpoint):
     def list(
         self,
         folder: str = ".",
+        *,
         extensions: Sequence[str] | None = None,
         include_hidden: bool = False,
     ) -> DirectoryListing:
         resp = self._send(_list_spec(folder, extensions, include_hidden))
         return parse_one(resp, DirectoryListing)
 
-    @overload
-    def get(self, file_path: str, *, parse_json: Literal[False] = False) -> bytes: ...
-    @overload
-    def get(self, file_path: str, *, parse_json: Literal[True]) -> Any: ...
+    def read_bytes(self, file_path: str) -> bytes:
+        """Download a file and return its raw bytes."""
+        return self._send(_download_spec(file_path)).content
 
-    def get(self, file_path: str, *, parse_json: bool = False) -> Any:
-        """Download a file. Returns raw bytes unless `parse_json=True`."""
-        resp = self._send(_download_spec(file_path))
-        return _parse_json(resp) if parse_json else resp.content
+    def read_text(self, file_path: str) -> str:
+        """Download a file and decode it as text (charset from the response)."""
+        return self._send(_download_spec(file_path)).text
 
-    def set(
+    def read_json(self, file_path: str) -> Any:
+        """Download a file and parse it as JSON."""
+        return _parse_json(self._send(_download_spec(file_path)))
+
+    def write(
         self,
         file_path: str,
         content: str | bytes,
         *,
         overwrite: bool = False,
     ) -> FileWriteResult:
-        """Upload a file via multipart/form-data. The form field is `file`.
+        """Upload a file via multipart/form-data (form field `file`).
 
-        SEPAL returns 409 on `setFile` when the file exists and `overwrite` is
-        false; legacy pysepal treated that as a soft success and so do we — an
-        empty `FileWriteResult` is returned.
+        Raises `Conflict` if the file already exists and `overwrite` is false.
         """
-        try:
-            resp = self._send(_set_spec(file_path, content, overwrite))
-        except Conflict:
-            return FileWriteResult()
+        resp = self._send(_write_spec(file_path, content, overwrite))
         return parse_one(resp, FileWriteResult, default={})
 
     def mkdir(self, path: str, *, parents: bool = True) -> PurePosixPath:
         """Create a folder under the user workspace; idempotent on 409/403.
 
         SEPAL returns 403 (not 409) for an already-existing folder in some
-        deployments, so both are swallowed to keep `mkdir` idempotent.
+        deployments, so both are swallowed to keep `mkdir` idempotent. Caveat:
+        that also hides a genuine permission failure — it will surface on the
+        first write into the folder instead.
         """
         relative = sanitize_write_path(path)
         try:
@@ -145,32 +148,30 @@ class AsyncUserFilesEndpoint(_AsyncEndpoint):
     async def list(
         self,
         folder: str = ".",
+        *,
         extensions: Sequence[str] | None = None,
         include_hidden: bool = False,
     ) -> DirectoryListing:
         resp = await self._send(_list_spec(folder, extensions, include_hidden))
         return parse_one(resp, DirectoryListing)
 
-    @overload
-    async def get(self, file_path: str, *, parse_json: Literal[False] = False) -> bytes: ...
-    @overload
-    async def get(self, file_path: str, *, parse_json: Literal[True]) -> Any: ...
+    async def read_bytes(self, file_path: str) -> bytes:
+        return (await self._send(_download_spec(file_path))).content
 
-    async def get(self, file_path: str, *, parse_json: bool = False) -> Any:
-        resp = await self._send(_download_spec(file_path))
-        return _parse_json(resp) if parse_json else resp.content
+    async def read_text(self, file_path: str) -> str:
+        return (await self._send(_download_spec(file_path))).text
 
-    async def set(
+    async def read_json(self, file_path: str) -> Any:
+        return _parse_json(await self._send(_download_spec(file_path)))
+
+    async def write(
         self,
         file_path: str,
         content: str | bytes,
         *,
         overwrite: bool = False,
     ) -> FileWriteResult:
-        try:
-            resp = await self._send(_set_spec(file_path, content, overwrite))
-        except Conflict:
-            return FileWriteResult()
+        resp = await self._send(_write_spec(file_path, content, overwrite))
         return parse_one(resp, FileWriteResult, default={})
 
     async def mkdir(self, path: str, *, parents: bool = True) -> PurePosixPath:

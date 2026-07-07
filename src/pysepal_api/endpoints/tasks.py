@@ -65,14 +65,14 @@ def _wait_step(task: Task, task_id: str) -> Task | None:
     FAILED/CANCELED, or return None to keep polling.
 
     CANCELING is non-terminal — the server has not finished the cancel
-    handshake yet.
+    handshake yet. Raised errors carry the observed task as `exc.task`.
     """
     if task.state is TaskState.COMPLETED:
         return task
     if task.state is TaskState.FAILED:
-        raise TaskFailed(f"Task {task_id} failed: {task.status_description}")
+        raise TaskFailed(f"Task {task_id} failed: {task.status_description}", task=task)
     if task.state is TaskState.CANCELED:
-        raise TaskCanceled(f"Task {task_id} was canceled")
+        raise TaskCanceled(f"Task {task_id} was canceled", task=task)
     return None
 
 
@@ -112,16 +112,21 @@ class TasksEndpoint(_SyncEndpoint):
         """Maps to SEPAL's `execute` route."""
         self._send(_action_spec(task_id, "execute"))
 
-    def wait(self, task_id: str, *, poll: float = 5.0, timeout: float | None = None) -> Task:
+    def wait(
+        self, task_id: str, *, poll_interval: float = 5.0, timeout: float | None = None
+    ) -> Task:
         """Poll `get(task_id)` until terminal. Raises on FAILED/CANCELED/timeout."""
         start = time.monotonic()
         while True:
-            done = _wait_step(self.get(task_id), task_id)
+            task = self.get(task_id)
+            done = _wait_step(task, task_id)
             if done is not None:
                 return done
             if timeout is not None and time.monotonic() - start >= timeout:
-                raise TaskTimeout(f"Task {task_id} did not reach terminal state in {timeout}s")
-            time.sleep(poll)
+                raise TaskTimeout(
+                    f"Task {task_id} did not reach terminal state in {timeout}s", task=task
+                )
+            time.sleep(poll_interval)
 
 
 class AsyncTasksEndpoint(_AsyncEndpoint):
@@ -159,12 +164,17 @@ class AsyncTasksEndpoint(_AsyncEndpoint):
     async def restart(self, task_id: str) -> None:
         await self._send(_action_spec(task_id, "execute"))
 
-    async def wait(self, task_id: str, *, poll: float = 5.0, timeout: float | None = None) -> Task:
+    async def wait(
+        self, task_id: str, *, poll_interval: float = 5.0, timeout: float | None = None
+    ) -> Task:
         start = time.monotonic()
         while True:
-            done = _wait_step(await self.get(task_id), task_id)
+            task = await self.get(task_id)
+            done = _wait_step(task, task_id)
             if done is not None:
                 return done
             if timeout is not None and time.monotonic() - start >= timeout:
-                raise TaskTimeout(f"Task {task_id} did not reach terminal state in {timeout}s")
-            await asyncio.sleep(poll)
+                raise TaskTimeout(
+                    f"Task {task_id} did not reach terminal state in {timeout}s", task=task
+                )
+            await asyncio.sleep(poll_interval)

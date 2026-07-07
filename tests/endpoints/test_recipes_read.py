@@ -42,9 +42,9 @@ def test_get_parses_json_body_by_default(http: httpx.Client) -> None:
         assert result == body
 
 
-def test_get_returns_bytes_when_requested(http: httpx.Client) -> None:
+def test_get_raw_returns_exact_bytes(http: httpx.Client) -> None:
     raw = b'{"id": "r1"}'
     with respx.mock(base_url="https://sepal.test") as mock:
         mock.get("/api/processing-recipes/r1").respond(200, content=raw)
         endpoint = ProcessingRecipesEndpoint(http)
-        assert endpoint.get("r1", parse_json=False) == raw
+        assert endpoint.get_raw("r1") == raw

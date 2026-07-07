@@ -22,7 +22,7 @@ from typing import Any, TypeVar
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from .errors import ResponseError, SepalTransportError, error_for_status
+from .errors import ResponseError, TransportError, error_for_status
 
 _M = TypeVar("_M", bound=BaseModel)
 
@@ -123,7 +123,7 @@ def send_with_error_mapping(client: httpx.Client, request: httpx.Request) -> htt
     try:
         response = client.send(request)
     except httpx.TransportError as exc:
-        raise SepalTransportError(f"{type(exc).__name__}: {exc}") from exc
+        raise TransportError(f"{type(exc).__name__}: {exc}") from exc
     if response.is_success:
         return response
     raise error_for_status(
@@ -140,7 +140,7 @@ async def send_with_error_mapping_async(
     try:
         response = await client.send(request)
     except httpx.TransportError as exc:
-        raise SepalTransportError(f"{type(exc).__name__}: {exc}") from exc
+        raise TransportError(f"{type(exc).__name__}: {exc}") from exc
     if response.is_success:
         return response
     raise error_for_status(

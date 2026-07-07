@@ -30,6 +30,27 @@ def test_directory_listing_envelope() -> None:
     assert listing.files == []
 
 
+def test_directory_listing_iterates_over_entries() -> None:
+    listing = DirectoryListing.model_validate(
+        {
+            "path": ".",
+            "files": [
+                {"name": "a", "path": "a", "type": "file", "size": 1},
+                {"name": "b", "path": "b", "type": "directory", "size": 0},
+            ],
+        }
+    )
+    assert len(listing) == 2
+    assert [entry.name for entry in listing] == ["a", "b"]
+
+
+def test_file_entry_tolerates_unknown_type_values() -> None:
+    # Forward-compat: a new server-side `type` must not break parsing.
+    entry = FileEntry.model_validate({"name": "s", "path": "s", "type": "socket", "size": 0})
+    assert entry.is_dir is False
+    assert entry.is_file is False
+
+
 def test_task_accepts_state_or_status() -> None:
     raw = Task.model_validate({"id": "t1", "state": "ACTIVE"})
     listed = Task.model_validate({"id": "t2", "status": "PENDING"})

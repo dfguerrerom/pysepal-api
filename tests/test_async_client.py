@@ -10,12 +10,8 @@ async def test_async_client_lists() -> None:
         mock.get("/api/user-files/listFiles").respond(
             200, json={"path": ".", "files": [], "count": 0}
         )
-        async with AsyncSepalClient(
-            base_url="https://sepal.test",
-            auth=NoAuth(),
-            create_base_dir=False,
-        ) as client:
-            listing = await client.user_files.list(".")
+        async with AsyncSepalClient(base_url="https://sepal.test", auth=NoAuth()) as client:
+            listing = await client.files.list(".")
             assert listing.path == "."
 
 
@@ -32,7 +28,8 @@ async def test_async_client_creates_module_dir() -> None:
 
 
 @pytest.mark.asyncio
-async def test_async_create_factory_makes_module_dir() -> None:
+async def test_async_create_can_be_awaited() -> None:
+    """Long-lived form: `sepal = await AsyncSepalClient.create(...)`."""
     with respx.mock(base_url="https://sepal.test") as mock:
         mock.post("/api/user-files/createFolder").respond(200, json={})
         client = await AsyncSepalClient.create(
@@ -45,13 +42,24 @@ async def test_async_create_factory_makes_module_dir() -> None:
 
 
 @pytest.mark.asyncio
+async def test_async_create_works_as_context_manager() -> None:
+    """Scoped form: `async with AsyncSepalClient.create(...)` — no `await` needed,
+    mirroring the sync spelling exactly."""
+    with respx.mock(base_url="https://sepal.test") as mock:
+        mock.post("/api/user-files/createFolder").respond(200, json={})
+        async with AsyncSepalClient.create(
+            base_url="https://sepal.test", auth=NoAuth(), module_name="demo"
+        ) as client:
+            assert str(client.results_path) == "/home/sepal-user/module_results/demo"
+        assert client._http.is_closed
+
+
+@pytest.mark.asyncio
 async def test_async_request_escape_hatch() -> None:
     with respx.mock(base_url="https://sepal.test") as mock:
         mock.get("/api/gee/image/json").respond(200, json={"ok": True})
         mock.get("/api/gee/missing").respond(404, text="nope")
-        async with AsyncSepalClient(
-            base_url="https://sepal.test", auth=NoAuth(), create_base_dir=False
-        ) as client:
+        async with AsyncSepalClient(base_url="https://sepal.test", auth=NoAuth()) as client:
             resp = await client.get("/api/gee/image/json", params={"recipeId": "foo"})
             assert resp.json() == {"ok": True}
             with pytest.raises(NotFound):

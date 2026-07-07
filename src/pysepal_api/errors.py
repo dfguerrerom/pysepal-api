@@ -4,9 +4,9 @@ Every exception the library raises derives from a single root, ``PysepalError``,
 so a caller can ``except PysepalError`` to catch *anything* this library throws.
 Beneath that root:
 
-- ``SepalApiError`` (and its status-specific subclasses) for non-2xx HTTP
+- ``ApiError`` (and its status-specific subclasses) for non-2xx HTTP
   responses from a SEPAL service.
-- ``SepalTransportError`` / ``NoCredentialsError`` / ``MissingHostError`` for
+- ``TransportError`` / ``NoCredentialsError`` / ``MissingHostError`` for
   non-HTTP problems (network, missing config).
 - ``TaskError`` (``TaskFailed`` / ``TaskCanceled`` / ``TaskTimeout``) for the
   terminal outcomes of ``tasks.wait``.
@@ -14,14 +14,17 @@ Beneath that root:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .models import Task
 
 
 class PysepalError(Exception):
     """Root of every exception raised by pysepal-api."""
 
 
-class SepalApiError(PysepalError):
+class ApiError(PysepalError):
     """Base for non-2xx responses from a SEPAL service."""
 
     def __init__(self, status_code: int, *, url: str, body: Any = None) -> None:
@@ -31,35 +34,35 @@ class SepalApiError(PysepalError):
         super().__init__(f"SEPAL API {status_code} for {url}")
 
 
-class BadRequest(SepalApiError):
+class BadRequest(ApiError):
     pass
 
 
-class Unauthorized(SepalApiError):
+class Unauthorized(ApiError):
     pass
 
 
-class Forbidden(SepalApiError):
+class Forbidden(ApiError):
     pass
 
 
-class NotFound(SepalApiError):
+class NotFound(ApiError):
     pass
 
 
-class Conflict(SepalApiError):
+class Conflict(ApiError):
     pass
 
 
-class TooManyRequests(SepalApiError):
+class TooManyRequests(ApiError):
     """429 — rate limited. Distinct so callers can back off programmatically."""
 
 
-class ServerError(SepalApiError):
+class ServerError(ApiError):
     pass
 
 
-class SepalTransportError(PysepalError):
+class TransportError(PysepalError):
     """Network/send failure: DNS, connection, timeout, etc."""
 
 
@@ -88,7 +91,15 @@ class InvalidPathError(PysepalError, ValueError):
 
 
 class TaskError(PysepalError):
-    """Base for a non-success terminal outcome of ``tasks.wait``."""
+    """Base for a non-success terminal outcome of ``tasks.wait``.
+
+    Carries the last-observed ``Task`` as ``task`` so callers can inspect
+    ``status_description`` / ``task_info`` without re-fetching.
+    """
+
+    def __init__(self, message: str, *, task: Task | None = None) -> None:
+        self.task = task
+        super().__init__(message)
 
 
 class TaskFailed(TaskError):
@@ -107,7 +118,7 @@ class TaskTimeout(TaskError, TimeoutError):
     """
 
 
-_BY_STATUS: dict[int, type[SepalApiError]] = {
+_BY_STATUS: dict[int, type[ApiError]] = {
     400: BadRequest,
     401: Unauthorized,
     403: Forbidden,
@@ -117,11 +128,11 @@ _BY_STATUS: dict[int, type[SepalApiError]] = {
 }
 
 
-def error_for_status(status_code: int, *, url: str, body: Any) -> SepalApiError:
-    """Map an HTTP status code to the most specific SepalApiError."""
+def error_for_status(status_code: int, *, url: str, body: Any) -> ApiError:
+    """Map an HTTP status code to the most specific ApiError."""
     cls = _BY_STATUS.get(status_code)
     if cls is None and 500 <= status_code < 600:
         cls = ServerError
     if cls is None:
-        cls = SepalApiError
+        cls = ApiError
     return cls(status_code, url=url, body=body)
