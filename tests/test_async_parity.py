@@ -2,9 +2,9 @@ import inspect
 
 import pytest
 
-from pysepal_api.endpoints.processing_recipes import (
-    AsyncProcessingRecipesEndpoint,
-    ProcessingRecipesEndpoint,
+from pysepal_api.endpoints.recipes import (
+    AsyncRecipesEndpoint,
+    RecipesEndpoint,
 )
 from pysepal_api.endpoints.tasks import AsyncTasksEndpoint, TasksEndpoint
 from pysepal_api.endpoints.user_files import (
@@ -15,7 +15,7 @@ from pysepal_api.endpoints.user_files import (
 PAIRS = [
     (UserFilesEndpoint, AsyncUserFilesEndpoint),
     (TasksEndpoint, AsyncTasksEndpoint),
-    (ProcessingRecipesEndpoint, AsyncProcessingRecipesEndpoint),
+    (RecipesEndpoint, AsyncRecipesEndpoint),
 ]
 
 

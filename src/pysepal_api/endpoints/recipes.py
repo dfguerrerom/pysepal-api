@@ -51,7 +51,7 @@ def _summaries(resp: Any) -> RecipeSummaries:
     return parse_many(resp, RecipeSummary)
 
 
-class ProcessingRecipesEndpoint(_SyncEndpoint):
+class RecipesEndpoint(_SyncEndpoint):
     def list(self) -> RecipeSummaries:
         return _summaries(self._send(RequestSpec("GET", "/api/processing-recipes")))
 
@@ -81,7 +81,7 @@ class ProcessingRecipesEndpoint(_SyncEndpoint):
         return _summaries(self._send(RequestSpec("DELETE", f"/api/processing-recipes/{recipe_id}")))
 
 
-class AsyncProcessingRecipesEndpoint(_AsyncEndpoint):
+class AsyncRecipesEndpoint(_AsyncEndpoint):
     async def list(self) -> RecipeSummaries:
         return _summaries(await self._send(RequestSpec("GET", "/api/processing-recipes")))
 

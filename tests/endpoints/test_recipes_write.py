@@ -5,8 +5,8 @@ import httpx
 import pytest
 import respx
 
-from pysepal_api.endpoints.processing_recipes import (
-    ProcessingRecipesEndpoint,
+from pysepal_api.endpoints.recipes import (
+    RecipesEndpoint,
 )
 
 
@@ -29,7 +29,7 @@ def test_save_gzips_contents_and_passes_query(http: httpx.Client) -> None:
                 }
             ],
         )
-        endpoint = ProcessingRecipesEndpoint(http)
+        endpoint = RecipesEndpoint(http)
         summaries = endpoint.save(
             recipe_id="r1",
             project_id="p1",
@@ -50,7 +50,7 @@ def test_save_gzips_contents_and_passes_query(http: httpx.Client) -> None:
 def test_save_accepts_bytes_payload(http: httpx.Client) -> None:
     with respx.mock(base_url="https://sepal.test") as mock:
         route = mock.post("/api/processing-recipes/r1").respond(200, json=[])
-        endpoint = ProcessingRecipesEndpoint(http)
+        endpoint = RecipesEndpoint(http)
         endpoint.save(
             recipe_id="r1",
             project_id="p1",
@@ -68,6 +68,6 @@ def test_delete_returns_updated_summaries(http: httpx.Client) -> None:
             200,
             json=[{"id": "r2", "name": "X", "type": "Y"}],
         )
-        endpoint = ProcessingRecipesEndpoint(http)
+        endpoint = RecipesEndpoint(http)
         summaries = endpoint.delete("r1")
         assert summaries[0].id == "r2"

@@ -28,7 +28,7 @@ from typing import Any
 import httpx
 
 from .auth import CookieAuth, detect_auth
-from .endpoints.processing_recipes import AsyncProcessingRecipesEndpoint, ProcessingRecipesEndpoint
+from .endpoints.recipes import AsyncRecipesEndpoint, RecipesEndpoint
 from .endpoints.tasks import AsyncTasksEndpoint, TasksEndpoint
 from .endpoints.user_files import AsyncUserFilesEndpoint, UserFilesEndpoint
 from .host import detect_base_url, normalize_base_url
@@ -102,7 +102,7 @@ class SepalClient:
         )
         self.files = UserFilesEndpoint(self._http)
         self.tasks = TasksEndpoint(self._http)
-        self.recipes = ProcessingRecipesEndpoint(self._http)
+        self.recipes = RecipesEndpoint(self._http)
 
     def __repr__(self) -> str:
         return f"SepalClient(base_url={self.base_url!r}, module_name={self.module_name!r})"
@@ -207,7 +207,7 @@ class AsyncSepalClient:
         )
         self.files = AsyncUserFilesEndpoint(self._http)
         self.tasks = AsyncTasksEndpoint(self._http)
-        self.recipes = AsyncProcessingRecipesEndpoint(self._http)
+        self.recipes = AsyncRecipesEndpoint(self._http)
 
     def __repr__(self) -> str:
         return f"AsyncSepalClient(base_url={self.base_url!r}, module_name={self.module_name!r})"
