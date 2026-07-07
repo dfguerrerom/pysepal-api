@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pysepal-api"
-version = "0.1.0"
+version = "0.2.0"
 description = "UI-free HTTP client for SEPAL platform services (user files, tasks, processing recipes)."
 readme = "README.md"
 license = "MIT"
