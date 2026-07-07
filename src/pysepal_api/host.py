@@ -2,10 +2,9 @@
 
 Precedence (highest first):
 
-1. Explicit `base_url=` (handled by the caller).
-2. Explicit legacy `sepal_host=` (handled by the caller).
-3. `SEPAL_ENDPOINT` env var, treated as a full URL.
-4. `SEPAL_HOST` env var, treated as a bare host.
+1. Explicit `base_url=` (handled by the caller; a bare host is accepted).
+2. `SEPAL_ENDPOINT` env var, treated as a full URL.
+3. `SEPAL_HOST` env var, treated as a bare host.
 """
 
 from __future__ import annotations

@@ -3,9 +3,9 @@ import pytest
 import respx
 
 from pysepal_api.errors import (
+    ApiError,
     NotFound,
-    SepalApiError,
-    SepalTransportError,
+    TransportError,
     Unauthorized,
 )
 from pysepal_api.transport import parse_json, send_with_error_mapping
@@ -55,7 +55,7 @@ def test_send_maps_5xx_generic() -> None:
         mock.get("/oops").respond(503, text="x")
         with _client() as c:
             req = c.build_request("GET", "/oops")
-            with pytest.raises(SepalApiError):
+            with pytest.raises(ApiError):
                 send_with_error_mapping(c, req)
 
 
@@ -64,7 +64,7 @@ def test_send_maps_transport_error() -> None:
         mock.get("/boom").mock(side_effect=httpx.ConnectError("dns"))
         with _client() as c:
             req = c.build_request("GET", "/boom")
-            with pytest.raises(SepalTransportError):
+            with pytest.raises(TransportError):
                 send_with_error_mapping(c, req)
 
 

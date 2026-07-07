@@ -5,26 +5,30 @@ surface — same endpoints, same method names, same generic escape hatch. The
 only thing that differs is `await`. Both build on the shared request core in
 `transport.py` and the shared config resolution below.
 
-Construction never performs network I/O. Use the `create()` factory (or a
-`with` / `async with` block) to eagerly create the module results directory:
+Construction never performs network I/O; entering the context (or awaiting
+`create()`) is what eagerly creates the module results directory:
 
-    with SepalClient.create(session_id=...) as c:          # sync
-        c.user_files.list("/")
+    with SepalClient(module_name="my_module") as sepal:                    # sync
+        sepal.files.list("/")
 
-    async with await AsyncSepalClient.create(session_id=...) as c:   # async
-        await c.user_files.list("/")
+    async with AsyncSepalClient.create(module_name="my_module") as sepal:  # async
+        await sepal.files.list("/")
+
+For long-lived clients skip the context manager: `sepal = SepalClient.create(...)`
+or `sepal = await AsyncSepalClient.create(...)`, then `close()` / `aclose()`.
 """
 
 from __future__ import annotations
 
 import os
+from collections.abc import Generator
 from pathlib import PurePosixPath
 from typing import Any
 
 import httpx
 
 from .auth import CookieAuth, detect_auth
-from .endpoints.processing_recipes import AsyncProcessingRecipesEndpoint, ProcessingRecipesEndpoint
+from .endpoints.recipes import AsyncRecipesEndpoint, RecipesEndpoint
 from .endpoints.tasks import AsyncTasksEndpoint, TasksEndpoint
 from .endpoints.user_files import AsyncUserFilesEndpoint, UserFilesEndpoint
 from .host import detect_base_url, normalize_base_url
@@ -33,34 +37,37 @@ from .transport import send_with_error_mapping, send_with_error_mapping_async
 
 # Hosts that legitimately serve self-signed certs in local development. TLS
 # verification is skipped only for these (matched on the parsed host, never a
-# substring) or via an explicit `PYSEPAL_INSECURE_TLS` opt-in — never for
-# arbitrary or production hosts.
+# substring) or for hosts explicitly listed in `PYSEPAL_INSECURE_TLS_HOSTS` —
+# never for arbitrary or production hosts.
 _LOCAL_INSECURE_HOSTS = {"host.docker.internal"}
+
+
+def _insecure_tls_hosts() -> set[str]:
+    """Local-dev defaults plus the comma-separated `PYSEPAL_INSECURE_TLS_HOSTS`
+    env opt-in. Matching is on the exact parsed host, case-insensitive."""
+    env = os.getenv("PYSEPAL_INSECURE_TLS_HOSTS", "")
+    return _LOCAL_INSECURE_HOSTS | {h.strip().lower() for h in env.split(",") if h.strip()}
 
 
 def _should_verify_tls(base_url: str) -> bool:
     """Whether to verify TLS for `base_url`. Secure by default."""
-    if os.getenv("PYSEPAL_INSECURE_TLS", "").strip().lower() in {"1", "true", "yes"}:
-        return False
-    return httpx.URL(base_url).host not in _LOCAL_INSECURE_HOSTS
+    host = httpx.URL(base_url).host
+    return host.lower() not in _insecure_tls_hosts()
 
 
 def _resolve_config(
     session_id: str | None,
     auth: httpx.Auth | None,
     base_url: str | None,
-    sepal_host: str | None,
     verify: bool | None,
 ) -> tuple[str, httpx.Auth, bool]:
     """Resolve base URL, auth, and TLS verification once for both clients.
 
     Auth precedence: explicit `auth=` → `session_id=` (wrapped in CookieAuth)
-    → `detect_auth()`. Host precedence: explicit `base_url=` → legacy
-    `sepal_host=` → `detect_base_url()`.
+    → `detect_auth()`. Host precedence: explicit `base_url=` (a bare host is
+    accepted and normalized to https) → `detect_base_url()`.
     """
-    resolved_base_url = normalize_base_url(
-        base_url or (f"https://{sepal_host}" if sepal_host else None) or detect_base_url()
-    )
+    resolved_base_url = normalize_base_url(base_url or detect_base_url())
     resolved_auth = auth or (CookieAuth(session_id) if session_id else detect_auth())
     resolved_verify = verify if verify is not None else _should_verify_tls(resolved_base_url)
     return resolved_base_url, resolved_auth, resolved_verify
@@ -73,23 +80,18 @@ class SepalClient:
 
     def __init__(
         self,
+        *,
         session_id: str | None = None,
         module_name: str | None = None,
-        *,
         auth: httpx.Auth | None = None,
         base_url: str | None = None,
-        sepal_host: str | None = None,
-        create_base_dir: bool = True,
         timeout: float | httpx.Timeout = 30.0,
         verify: bool | None = None,
     ) -> None:
-        base, resolved_auth, resolved_verify = _resolve_config(
-            session_id, auth, base_url, sepal_host, verify
-        )
+        base, resolved_auth, resolved_verify = _resolve_config(session_id, auth, base_url, verify)
         self.module_name = module_name
         self.base_url = base
-        self.verify_ssl = resolved_verify
-        self._create_base_dir = create_base_dir
+        self.verify = resolved_verify
         self.results_path: PurePosixPath | None = None
         self._http = httpx.Client(
             base_url=base,
@@ -98,55 +100,55 @@ class SepalClient:
             timeout=timeout,
             headers={"Accept": "application/json"},
         )
-        self.user_files = UserFilesEndpoint(self._http)
+        self.files = UserFilesEndpoint(self._http)
         self.tasks = TasksEndpoint(self._http)
-        self.processing_recipes = ProcessingRecipesEndpoint(self._http)
-        self.recipes = self.processing_recipes
+        self.recipes = RecipesEndpoint(self._http)
+
+    def __repr__(self) -> str:
+        return f"SepalClient(base_url={self.base_url!r}, module_name={self.module_name!r})"
 
     @classmethod
     def create(
         cls,
+        *,
         session_id: str | None = None,
         module_name: str | None = None,
-        *,
         auth: httpx.Auth | None = None,
         base_url: str | None = None,
-        sepal_host: str | None = None,
-        create_base_dir: bool = True,
         timeout: float | httpx.Timeout = 30.0,
         verify: bool | None = None,
     ) -> SepalClient:
-        """Build a client and eagerly create the module results dir (if any).
-
-        The recommended entry point: `__init__` does no network I/O, so this is
-        where `module_dir` creation happens (also triggered by entering `with`).
-        """
+        """Build a ready-to-use client, eagerly creating the module results dir
+        (if `module_name` is given). Entry point for long-lived clients; for
+        scoped use, `with SepalClient(...)` does the same setup on entry."""
         client = cls(
-            session_id,
-            module_name,
+            session_id=session_id,
+            module_name=module_name,
             auth=auth,
             base_url=base_url,
-            sepal_host=sepal_host,
-            create_base_dir=create_base_dir,
             timeout=timeout,
             verify=verify,
         )
+        return client._setup()
+
+    def _setup(self) -> SepalClient:
+        """Run eager setup, closing the client instead of leaking it on failure."""
         try:
-            client._ensure_results_path()
+            self._ensure_results_path()
         except BaseException:
-            client.close()
+            self.close()
             raise
-        return client
+        return self
 
     def _ensure_results_path(self) -> PurePosixPath | None:
-        if self.results_path is None and self.module_name and self._create_base_dir:
-            self.results_path = self.user_files.module_dir(self.module_name)
+        if self.results_path is None and self.module_name:
+            self.results_path = self.files.module_dir(self.module_name)
         return self.results_path
 
     def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
         """Issue an arbitrary authenticated request to any SEPAL route.
 
-        The typed endpoints (`user_files`, `tasks`, `recipes`) cover the common
+        The typed endpoints (`files`, `tasks`, `recipes`) cover the common
         cases; this is the escape hatch for routes the library doesn't model.
         Returns the raw `httpx.Response` with errors mapped to typed exceptions.
         `kwargs` are forwarded to `httpx.Client.build_request` (`params`,
@@ -170,12 +172,7 @@ class SepalClient:
         self._http.close()
 
     def __enter__(self) -> SepalClient:
-        try:
-            self._ensure_results_path()
-        except BaseException:
-            self.close()
-            raise
-        return self
+        return self._setup()
 
     def __exit__(self, *exc: Any) -> None:
         self.close()
@@ -188,23 +185,18 @@ class AsyncSepalClient:
 
     def __init__(
         self,
+        *,
         session_id: str | None = None,
         module_name: str | None = None,
-        *,
         auth: httpx.Auth | None = None,
         base_url: str | None = None,
-        sepal_host: str | None = None,
-        create_base_dir: bool = True,
         timeout: float | httpx.Timeout = 30.0,
         verify: bool | None = None,
     ) -> None:
-        base, resolved_auth, resolved_verify = _resolve_config(
-            session_id, auth, base_url, sepal_host, verify
-        )
+        base, resolved_auth, resolved_verify = _resolve_config(session_id, auth, base_url, verify)
         self.module_name = module_name
         self.base_url = base
-        self.verify_ssl = resolved_verify
-        self._create_base_dir = create_base_dir
+        self.verify = resolved_verify
         self.results_path: PurePosixPath | None = None
         self._http = httpx.AsyncClient(
             base_url=base,
@@ -213,45 +205,53 @@ class AsyncSepalClient:
             timeout=timeout,
             headers={"Accept": "application/json"},
         )
-        self.user_files = AsyncUserFilesEndpoint(self._http)
+        self.files = AsyncUserFilesEndpoint(self._http)
         self.tasks = AsyncTasksEndpoint(self._http)
-        self.processing_recipes = AsyncProcessingRecipesEndpoint(self._http)
-        self.recipes = self.processing_recipes
+        self.recipes = AsyncRecipesEndpoint(self._http)
+
+    def __repr__(self) -> str:
+        return f"AsyncSepalClient(base_url={self.base_url!r}, module_name={self.module_name!r})"
 
     @classmethod
-    async def create(
+    def create(
         cls,
+        *,
         session_id: str | None = None,
         module_name: str | None = None,
-        *,
         auth: httpx.Auth | None = None,
         base_url: str | None = None,
-        sepal_host: str | None = None,
-        create_base_dir: bool = True,
         timeout: float | httpx.Timeout = 30.0,
         verify: bool | None = None,
-    ) -> AsyncSepalClient:
-        """Build a client and eagerly create the module results dir (if any)."""
+    ) -> _AwaitableClient:
+        """Build a ready-to-use client, eagerly creating the module results dir
+        (if `module_name` is given). The result can be awaited *or* used as an
+        async context manager — both spellings work:
+
+            sepal = await AsyncSepalClient.create(...)      # long-lived
+            async with AsyncSepalClient.create(...) as sepal:   # scoped
+        """
         client = cls(
-            session_id,
-            module_name,
+            session_id=session_id,
+            module_name=module_name,
             auth=auth,
             base_url=base_url,
-            sepal_host=sepal_host,
-            create_base_dir=create_base_dir,
             timeout=timeout,
             verify=verify,
         )
+        return _AwaitableClient(client)
+
+    async def _setup(self) -> AsyncSepalClient:
+        """Run eager setup, closing the client instead of leaking it on failure."""
         try:
-            await client._ensure_results_path()
+            await self._ensure_results_path()
         except BaseException:
-            await client.aclose()
+            await self.aclose()
             raise
-        return client
+        return self
 
     async def _ensure_results_path(self) -> PurePosixPath | None:
-        if self.results_path is None and self.module_name and self._create_base_dir:
-            self.results_path = await self.user_files.module_dir(self.module_name)
+        if self.results_path is None and self.module_name:
+            self.results_path = await self.files.module_dir(self.module_name)
         return self.results_path
 
     async def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
@@ -276,12 +276,24 @@ class AsyncSepalClient:
         await self._http.aclose()
 
     async def __aenter__(self) -> AsyncSepalClient:
-        try:
-            await self._ensure_results_path()
-        except BaseException:
-            await self.aclose()
-            raise
-        return self
+        return await self._setup()
 
     async def __aexit__(self, *exc: Any) -> None:
         await self.aclose()
+
+
+class _AwaitableClient:
+    """Result of `AsyncSepalClient.create()`: awaitable and an async context
+    manager, so `await create(...)` and `async with create(...)` both work."""
+
+    def __init__(self, client: AsyncSepalClient) -> None:
+        self._client = client
+
+    def __await__(self) -> Generator[Any, None, AsyncSepalClient]:
+        return self._client._setup().__await__()
+
+    async def __aenter__(self) -> AsyncSepalClient:
+        return await self._client._setup()
+
+    async def __aexit__(self, *exc: Any) -> None:
+        await self._client.aclose()

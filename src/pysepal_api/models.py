@@ -7,9 +7,10 @@ exposing Pythonic `snake_case` attributes.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import datetime
 from enum import Enum
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
@@ -28,9 +29,11 @@ class _Base(BaseModel):
 
 
 class FileEntry(_Base):
+    # `type` is a plain str (usually "directory" / "file" / "symlink") so a new
+    # server-side value degrades gracefully instead of failing validation.
     name: str
     path: str
-    type: Literal["directory", "file", "symlink"]
+    type: str
     size: int
     modified_time: datetime | None = Field(default=None, alias="modifiedTime")
     is_symlink: bool = Field(default=False, alias="isSymlink")
@@ -39,11 +42,23 @@ class FileEntry(_Base):
     def is_dir(self) -> bool:
         return self.type == "directory"
 
+    @property
+    def is_file(self) -> bool:
+        return self.type == "file"
+
 
 class DirectoryListing(_Base):
     path: str
     files: list[FileEntry]
     count: int | None = None
+
+    # Iterating/len-ing a listing means its entries. Overriding BaseModel's
+    # field-tuple __iter__ is deliberate; use model_dump() for serialization.
+    def __iter__(self) -> Iterator[FileEntry]:  # type: ignore[override]
+        return iter(self.files)
+
+    def __len__(self) -> int:
+        return len(self.files)
 
 
 class Task(_Base):

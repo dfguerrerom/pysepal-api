@@ -3,6 +3,7 @@
 from .auth import ApiKeyAuth, CookieAuth, NoAuth, detect_auth
 from .client import AsyncSepalClient, SepalClient
 from .errors import (
+    ApiError,
     BadRequest,
     Conflict,
     Forbidden,
@@ -12,14 +13,13 @@ from .errors import (
     NotFound,
     PysepalError,
     ResponseError,
-    SepalApiError,
-    SepalTransportError,
     ServerError,
     TaskCanceled,
     TaskError,
     TaskFailed,
     TaskTimeout,
     TooManyRequests,
+    TransportError,
     Unauthorized,
 )
 from .host import detect_base_url, normalize_base_url
@@ -35,6 +35,7 @@ from .models import (
 __version__ = "0.1.0"
 
 __all__ = [
+    "ApiError",
     "ApiKeyAuth",
     "AsyncSepalClient",
     "BadRequest",
@@ -52,9 +53,7 @@ __all__ = [
     "PysepalError",
     "RecipeSummary",
     "ResponseError",
-    "SepalApiError",
     "SepalClient",
-    "SepalTransportError",
     "ServerError",
     "Task",
     "TaskCanceled",
@@ -63,6 +62,7 @@ __all__ = [
     "TaskState",
     "TaskTimeout",
     "TooManyRequests",
+    "TransportError",
     "Unauthorized",
     "__version__",
     "detect_auth",
