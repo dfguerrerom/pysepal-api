@@ -29,3 +29,12 @@ async with AsyncSepalClient(module_name="my_module") as sepal:
 ```
 
 The two clients are twins: identical surface, the only difference is `await`.
+
+## Where to go next
+
+- **[Getting started](guides/getting-started.md)** — install, construct a client, first call
+- **[Authentication](guides/authentication.md)** — API key, session cookie, auto-detect
+- **[Connecting & TLS](guides/connecting.md)** — host resolution and local-dev TLS
+- **[Usage](guides/usage.md)** — files, tasks, recipes
+- **[Error handling](guides/error-handling.md)** — the exception hierarchy
+- **[API Reference](reference/client.md)** — full generated reference

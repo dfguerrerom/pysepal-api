@@ -53,6 +53,12 @@ exclude_docs: |
 
 nav:
   - Home: index.md
+  - Guides:
+      - Getting started: guides/getting-started.md
+      - Authentication: guides/authentication.md
+      - Connecting & TLS: guides/connecting.md
+      - Usage: guides/usage.md
+      - Error handling: guides/error-handling.md
   - API Reference:
       - Client: reference/client.md
       - Endpoints: reference/endpoints.md
