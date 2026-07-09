@@ -30,6 +30,7 @@ plugins:
           paths: [src]
           options:
             filters: ["!^_"]
+            show_if_no_docstring: true
             show_root_heading: true
             show_source: true
             separate_signature: true
@@ -52,3 +53,10 @@ exclude_docs: |
 
 nav:
   - Home: index.md
+  - API Reference:
+      - Client: reference/client.md
+      - Endpoints: reference/endpoints.md
+      - Models: reference/models.md
+      - Auth: reference/auth.md
+      - Host: reference/host.md
+      - Errors: reference/errors.md
