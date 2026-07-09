@@ -15,6 +15,12 @@ dependencies = [
   "pydantic>=2.6",
 ]
 
+[project.urls]
+Homepage = "https://dfguerrerom.github.io/pysepal-api/"
+Documentation = "https://dfguerrerom.github.io/pysepal-api/"
+Repository = "https://github.com/dfguerrerom/pysepal-api"
+Changelog = "https://github.com/dfguerrerom/pysepal-api/blob/main/CHANGELOG.md"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8",
@@ -26,6 +32,12 @@ dev = [
   "nox>=2024.4.15",
   "commitizen>=3.29",
   "pre-commit>=3.7",
+]
+docs = [
+  "mkdocs>=1.6",
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.26",
+  "griffe>=1.0",
 ]
 
 [tool.hatch.build.targets.wheel]
