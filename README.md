@@ -1,5 +1,7 @@
 # pysepal-api
 
+📖 **[Documentation](https://dfguerrerom.github.io/pysepal-api/)**
+
 UI-free HTTP client for SEPAL platform services. Powers Jupyter notebooks, Voila apps, CLI scripts, and background jobs running inside a SEPAL sandbox.
 
 ```python

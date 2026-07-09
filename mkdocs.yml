@@ -66,3 +66,4 @@ nav:
       - Auth: reference/auth.md
       - Host: reference/host.md
       - Errors: reference/errors.md
+  - Changelog: changelog.md
