@@ -38,6 +38,7 @@ docs = [
   "mkdocs-material>=9.5",
   "mkdocstrings[python]>=0.26",
   "griffe>=1.0",
+  "black>=24",
 ]
 
 [tool.hatch.build.targets.wheel]

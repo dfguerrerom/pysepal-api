@@ -33,6 +33,7 @@ plugins:
             show_if_no_docstring: true
             show_root_heading: true
             show_source: true
+            show_bases: false
             separate_signature: true
             show_signature_annotations: true
             members_order: source
