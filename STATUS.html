@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>pysepal-api — project status</title>
+<style>
+  :root {
+    --bg: #faf8f5;
+    --fg: #1f2933;
+    --muted: #5c6773;
+    --accent: #b07a3a;
+    --accent-soft: #ead7b8;
+    --green: #4a7a3a;
+    --red: #a8423a;
+    --amber: #b07a3a;
+    --card: #ffffff;
+    --border: #e3dccf;
+    --code-bg: #f1ece1;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.55;
+    margin: 0;
+    padding: 2rem 1rem 4rem;
+  }
+  main { max-width: 880px; margin: 0 auto; }
+  header {
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 1rem;
+    margin-bottom: 2rem;
+  }
+  h1 {
+    margin: 0 0 0.25rem;
+    font-size: 2rem;
+    color: var(--accent);
+  }
+  header p { margin: 0; color: var(--muted); }
+  h2 {
+    margin-top: 2.5rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 1.25rem;
+  }
+  h3 { font-size: 1rem; margin-top: 1.5rem; }
+  code {
+    background: var(--code-bg);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+    font-size: 0.9em;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 0.85rem 1rem;
+    border-radius: 5px;
+    overflow-x: auto;
+    font-size: 0.85em;
+    line-height: 1.45;
+  }
+  pre code { background: none; padding: 0; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    margin: 1rem 0;
+  }
+  ul.checklist { list-style: none; padding-left: 0; }
+  ul.checklist li { padding: 0.25rem 0; }
+  .done::before  { content: "✓ "; color: var(--green); font-weight: 700; }
+  .todo::before  { content: "○ "; color: var(--muted); font-weight: 700; }
+  .partial::before { content: "◐ "; color: var(--amber); font-weight: 700; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.75rem;
+    margin: 1rem 0;
+  }
+  .stat {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+  }
+  .stat .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat .value { font-size: 1.4rem; font-weight: 600; margin-top: 0.2rem; }
+  table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; }
+  th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+  th { background: var(--accent-soft); font-weight: 600; }
+  .flow {
+    background: var(--card);
+    border: 1px dashed var(--border);
+    padding: 1rem;
+    border-radius: 6px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.85em;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.85em;
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1>pysepal-api</h1>
+  <p>UI-free HTTP client for SEPAL platform services — status snapshot (2026-05-18)</p>
+</header>
+
+<section>
+  <h2>What this is</h2>
+  <p>
+    A pure-Python HTTP client library for the SEPAL platform's user-files,
+    tasks, and processing-recipes services. No Solara, no Voila, no Jupyter
+    widgets — that lives in <code>pysepal</code>. This package is what you
+    import from notebooks, CLI scripts, background jobs, or other Python
+    code that needs to talk to SEPAL without dragging in UI dependencies.
+  </p>
+  <p>
+    Built on <code>httpx</code> with both sync and async clients,
+    <code>pydantic</code> v2 models, and a drop-in compatibility shim for
+    the legacy <code>pysepal v3</code> <code>SepalClient</code>.
+  </p>
+</section>
+
+<section>
+  <h2>By the numbers</h2>
+  <div class="grid">
+    <div class="stat"><div class="label">Version</div><div class="value">0.1.0</div></div>
+    <div class="stat"><div class="label">On PyPI</div><div class="value">0.1.0 ✓</div></div>
+    <div class="stat"><div class="label">Python</div><div class="value">3.10 – 3.12</div></div>
+    <div class="stat"><div class="label">Source LoC</div><div class="value">~1,250</div></div>
+    <div class="stat"><div class="label">Test LoC</div><div class="value">~620</div></div>
+    <div class="stat"><div class="label">Endpoints</div><div class="value">3</div></div>
+    <div class="stat"><div class="label">Hosted at</div><div class="value">github.com/dfguerrerom</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>What we've built</h2>
+
+  <div class="card">
+    <h3>Core client (sync + async)</h3>
+    <ul class="checklist">
+      <li class="done"><code>SepalClient</code> — sync, context-manager friendly, with auth/host/verify resolution from env (<code>SEPAL_HOST</code>, sandbox cookie, etc.)</li>
+      <li class="done"><code>AsyncSepalClient</code> — full async parity, drives the same endpoint code paths</li>
+      <li class="done">Transport layer with consistent error mapping (<code>SepalAuthError</code>, <code>SepalAPIError</code>, …)</li>
+      <li class="done">Path helpers normalizing SEPAL's quirky <code>/home/&lt;user&gt;/...</code> conventions</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Endpoints</h3>
+    <table>
+      <thead><tr><th>Endpoint</th><th>Operations</th></tr></thead>
+      <tbody>
+        <tr><td><code>user_files</code></td><td>list, get, upload, download, createFolder (idempotent), module_dir helper</td></tr>
+        <tr><td><code>tasks</code></td><td>submit, list (with filters), get (with details), cancel, remove, restart, wait (terminal-state aware)</td></tr>
+        <tr><td><code>processing_recipes</code></td><td>list, get, save (gzip), delete</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Compatibility</h3>
+    <ul class="checklist">
+      <li class="done"><code>pysepal_api.compat</code> exposes a <code>SepalClient</code> matching the legacy <code>pysepal v3</code> surface so existing apps can swap imports without rewrites</li>
+      <li class="done"><code>cookies</code> attribute is a dict (matches legacy behavior, not httpx default)</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Quality gates</h3>
+    <ul class="checklist">
+      <li class="done"><code>ruff</code> + <code>black</code> lint, <code>mypy --strict</code>, <code>pytest</code> via <code>nox</code></li>
+      <li class="done">Tests use <code>respx</code> to mock httpx — no live SEPAL needed in CI</li>
+      <li class="done">All gates green at <code>v0.1.0</code></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Release tooling (this week)</h3>
+    <ul class="checklist">
+      <li class="done">Conventional Commits via <code>commitizen</code> (configured in <code>pyproject.toml</code>, <code>version_provider = "pep621"</code>)</li>
+      <li class="done"><code>pre-commit</code> with <code>commit-msg</code> hook rejecting non-conventional messages locally</li>
+      <li class="done"><code>.github/workflows/release.yml</code> — SHA-pinned, OIDC-based, triggers on <code>release: published</code> or <code>workflow_dispatch</code></li>
+      <li class="done">Repository pushed to <code>github.com/dfguerrerom/pysepal-api</code> (private)</li>
+      <li class="done"><code>v0.1.0</code> GitHub Release created</li>
+      <li class="done"><code>v0.1.0</code> published to PyPI via OIDC on 2026-05-16 (<code>workflow_dispatch</code> run, 32s)</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>Where we are right now</h2>
+  <p>
+    <strong>v0.1.0 is live on PyPI.</strong> The OIDC trusted-publishing
+    pipeline worked end-to-end on 2026-05-16 via
+    <code>workflow_dispatch</code> against <code>main</code>; the run
+    completed in 32 seconds and the project page now exists at
+    <code>pypi.org/project/pysepal-api</code>. Future releases follow the
+    normal flow: <code>cz bump</code> → push tag → <code>gh release create</code>
+    → workflow runs automatically on <code>release: published</code>.
+  </p>
+  <p>
+    Focus now shifts to <strong>hardening</strong> the repo before opening
+    it up: add a <code>tests.yml</code> CI workflow, configure branch
+    protection on <code>main</code>, drop a <code>CODEOWNERS</code> file
+    and a <code>SECURITY.md</code>. Tracking lives in <code>HARDENING.md</code>.
+  </p>
+</section>
+
+<section>
+  <h2>What's missing</h2>
+
+  <h3>Hardening checklist (see HARDENING.md)</h3>
+  <ul class="checklist">
+    <li class="todo"><code>tests.yml</code> workflow (lint + mypy + tests across 3.10/3.11/3.12)</li>
+    <li class="todo">Branch protection rules on <code>main</code> (required reviews, required checks, no force-push, no admin bypass)</li>
+    <li class="todo"><code>.github/CODEOWNERS</code> for sensitive paths</li>
+    <li class="todo"><code>SECURITY.md</code> with private vulnerability disclosure pointer</li>
+    <li class="todo">Decide when to flip the repo from private to public</li>
+  </ul>
+
+  <h3>Library scope (future)</h3>
+  <ul class="checklist">
+    <li class="todo">Additional SEPAL endpoints as needs emerge (auth, sandbox sessions, etc.)</li>
+    <li class="todo"><code>docs/</code> — referenced in README but doesn't exist yet</li>
+    <li class="todo">Optional: integration test suite gated on real <code>SEPAL_HOST</code> credentials</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Release flow</h2>
+  <div class="flow">cz bump                             # bumps version in pyproject.toml + __init__.py
+                                    # generates CHANGELOG entry
+                                    # creates git tag v&lt;new&gt;
+
+git push &amp;&amp; git push --tags         # ship commits + tag to GitHub
+
+gh release create v&lt;new&gt; \           # creates GitHub Release
+   --title "v&lt;new&gt;" \
+   --notes-from-tag                  # → fires release: published
+
+                                    # release.yml runs:
+                                    #   1. python -m build
+                                    #   2. pypa/gh-action-pypi-publish via OIDC
+                                    #   3. PyPI receives the dist
+</div>
+  <p>
+    Auth to PyPI is OIDC-only — no <code>PYPI_PASSWORD</code> secret exists
+    in the repo. Trusted publishing is scoped to the
+    <code>dfguerrerom/pysepal-api</code> + <code>release.yml</code> +
+    <code>pypi</code> environment triple.
+  </p>
+</section>
+
+<section>
+  <h2>Goals</h2>
+  <ul class="checklist">
+    <li>Be the lightweight, dependency-minimal HTTP layer that every SEPAL-aware Python project depends on.</li>
+    <li>Sync + async parity so notebooks, FastAPI services, and CLI scripts all get the same model.</li>
+    <li>Drop-in for legacy <code>pysepal v3 SepalClient</code> consumers — migration costs nothing.</li>
+    <li>Type-safe end to end (<code>mypy --strict</code>, pydantic v2 models).</li>
+    <li>Boringly reliable release pipeline: conventional commits → cz bump → GitHub Release → PyPI, no manual steps in the auth path.</li>
+  </ul>
+</section>
+
+<footer>
+  <p>Generated 2026-05-18 · See <code>HARDENING.md</code> for the security/release checklist · <code>CLAUDE.md</code> for agent-facing notes.</p>
+</footer>
+
+</main>
+</body>
+</html>

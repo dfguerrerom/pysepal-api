@@ -24,7 +24,7 @@ from typing import Any
 
 from ..errors import MissingDependency
 from ..models import Task
-from .tasks import TasksEndpoint
+from .tasks import AsyncTasksEndpoint, TasksEndpoint
 
 _SOURCE = "pysepal-api"
 _INSTALL_HINT = "install the Earth Engine extra with `pip install pysepal-api[ee]`"
@@ -384,3 +384,100 @@ class EEExportsEndpoint:
             strategy=strategy,
         )
         return self._tasks.submit("ee.export", params, instance_type=instance_type)
+
+
+class AsyncEEExportsEndpoint:
+    """Submit Earth Engine image/table exports through SEPAL TaskManager (async)."""
+
+    def __init__(self, tasks: AsyncTasksEndpoint) -> None:
+        self._tasks = tasks
+
+    async def submit_image(
+        self,
+        *,
+        image: Any,
+        destination: EEExportDestination | str,
+        name: str,
+        region: Any = None,
+        scale: float | None = None,
+        crs: str | None = None,
+        crs_transform: list[float] | None = None,
+        dimensions: str | int | None = None,
+        max_pixels: int | None = 10_000_000_000_000,
+        shard_size: int | None = None,
+        file_dimensions: int | list[int] | None = None,
+        skip_empty_tiles: bool | None = None,
+        file_format: str | None = "GEO_TIFF",
+        format_options: dict[str, Any] | None = None,
+        retries: int | None = None,
+        asset_id: str | None = None,
+        asset_type: str | None = None,
+        sharing: str | None = None,
+        strategy: str | None = None,
+        pyramiding_policy: str | dict[str, str] | None = None,
+        tile_size: int | None = None,
+        properties: dict[str, Any] | None = None,
+        workspace_path: str | None = None,
+        drive_folder: str | None = None,
+        filename_prefix: str | None = None,
+        instance_type: str | None = None,
+    ) -> Task:
+        params = _image_params(
+            destination=destination,
+            name=name,
+            image=image,
+            region=region,
+            scale=scale,
+            crs=crs,
+            crs_transform=crs_transform,
+            dimensions=dimensions,
+            max_pixels=max_pixels,
+            shard_size=shard_size,
+            file_dimensions=file_dimensions,
+            skip_empty_tiles=skip_empty_tiles,
+            file_format=file_format,
+            format_options=format_options,
+            retries=retries,
+            asset_id=asset_id,
+            asset_type=asset_type,
+            sharing=sharing,
+            strategy=strategy,
+            pyramiding_policy=pyramiding_policy,
+            tile_size=tile_size,
+            properties=properties,
+            workspace_path=workspace_path,
+            drive_folder=drive_folder,
+            filename_prefix=filename_prefix,
+        )
+        return await self._tasks.submit("ee.export", params, instance_type=instance_type)
+
+    async def submit_table(
+        self,
+        *,
+        collection: Any,
+        destination: EEExportDestination | str,
+        name: str,
+        asset_id: str | None = None,
+        workspace_path: str | None = None,
+        drive_folder: str | None = None,
+        filename_prefix: str | None = None,
+        file_format: str | None = "SHP",
+        selectors: list[str] | None = None,
+        max_vertices: int | None = None,
+        strategy: str | None = None,
+        instance_type: str | None = None,
+    ) -> Task:
+        params = _table_params(
+            destination=destination,
+            name=name,
+            collection=collection,
+            asset_id=asset_id,
+            workspace_path=workspace_path,
+            drive_folder=drive_folder,
+            filename_prefix=filename_prefix,
+            file_format=file_format,
+            selectors=selectors,
+            max_vertices=max_vertices,
+            strategy=strategy,
+        )
+        return await self._tasks.submit("ee.export", params, instance_type=instance_type)

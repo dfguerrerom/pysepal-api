@@ -149,16 +149,16 @@ Rules:
 - [ ] Assert the emitted payload for image→SEPAL and table→GEE equals a golden derived from the **branch's** `eeExport.contract.test.js` (so any client/server drift breaks a unit test). The JS side of the contract already exists on the branch — do **not** add a new JS contract test here.
 - [ ] Run → PASS; commit (`test: lock EE export task contract`).
 
-### Task 4: Review + Rebase + Merge the SEPAL Branch
+### Task 4: SEPAL Branch — Clean Rebase, ESM Port, Merge
 
 **Repo:** `sepal` (worktree `/home/dguerrero/sepal/worktrees/taskmanager-ee-export`, branch `feat/taskmanager-ee-export`).
 
-> This replaces the original plan's "implement `eeExport.js` / `toTable.js`" tasks — that code already exists on the branch.
+> This replaces the original plan's "implement `eeExport.js` / `toTable.js`" tasks — that code already exists (as loose work in the worktree).
 
-- [ ] **Step 1: Review** the branch's `eeExport.js` + `eeExport.contract.test.js` against the Contract above and Task 1's builder. Confirm every key the Python builder emits is consumed, and that `workspacePath` home-dir resolution + `..` guard behave as documented.
-- [ ] **Step 2: Run the branch's task tests** (`cd modules/task && npm test -- eeExport.test.js eeExport.contract.test.js`).
-- [ ] **Step 3: Rebase** the active working branch onto `feat/taskmanager-ee-export` (the working branch currently carries unrelated new work; take a backup ref first).
-- [ ] **Step 4: Merge/deploy** so `ee.export` is live before pysepal-api helpers are released for use against production SEPAL.
+- [x] **Step 1: Clean rebase onto master** (done 2026-07-16). The work was uncommitted on a base 104 commits stale; snapshotted to tag `backup/ee-export-presnapshot-2026-07-16`, rebased onto `origin/master`, resolved the one-line `taskRunner.js` conflict (master now uses ESM `require('./tasks/x.js')` form), and committed as `feat(task): add generic ee.export worker for IMAGE/TABLE exports` (`2b4eaf3e6`).
+- [ ] **Step 2: CommonJS → ESM port (blocking).** Master migrated the task module to ESM (`modules/task/package.json` → `"type": "module"`; siblings use `import`/`export`). The new files are still CommonJS and will not load. Convert `eeExport.js`, `eeExport.test.js`, `eeExport.contract.test.js`, `toTable.js`, `toTable.test.js`: `require(...)` → `import ... from '...js'`, `module.exports = {...}` → `export const ...`, add `.js` extensions on relative specifiers. (The `toDrive.js`/`toSepal.js` edits auto-merged into the ESM files and are fine.)
+- [ ] **Step 3: Run the task tests** (`cd modules/task && npm test -- eeExport.test.js eeExport.contract.test.js toTable.test.js`) and lint. Confirm every key the pysepal-api builder emits is consumed and `workspacePath` home-dir resolution + `..` guard behave as documented.
+- [ ] **Step 4: Merge/deploy** so `ee.export` is live before pysepal-api helpers are released against production SEPAL. (Rebasing any *other* in-progress working branch onto this is a separate, user-driven step — not part of this task.)
 
 ### Task 5: Documentation
 

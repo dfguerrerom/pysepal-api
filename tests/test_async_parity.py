@@ -2,6 +2,10 @@ import inspect
 
 import pytest
 
+from pysepal_api.endpoints.ee_exports import (
+    AsyncEEExportsEndpoint,
+    EEExportsEndpoint,
+)
 from pysepal_api.endpoints.recipes import (
     AsyncRecipesEndpoint,
     RecipesEndpoint,
@@ -16,6 +20,7 @@ PAIRS = [
     (UserFilesEndpoint, AsyncUserFilesEndpoint),
     (TasksEndpoint, AsyncTasksEndpoint),
     (RecipesEndpoint, AsyncRecipesEndpoint),
+    (EEExportsEndpoint, AsyncEEExportsEndpoint),
 ]
 
 

@@ -2,12 +2,20 @@
 
 from .auth import ApiKeyAuth, CookieAuth, NoAuth, detect_auth
 from .client import AsyncSepalClient, SepalClient
+from .endpoints.ee_exports import (
+    AsyncEEExportsEndpoint,
+    EEExportDestination,
+    EEExportKind,
+    EEExportsEndpoint,
+    serialize_ee_object,
+)
 from .errors import (
     ApiError,
     BadRequest,
     Conflict,
     Forbidden,
     InvalidPathError,
+    MissingDependency,
     MissingHostError,
     NoCredentialsError,
     NotFound,
@@ -37,15 +45,20 @@ __version__ = "0.2.0"
 __all__ = [
     "ApiError",
     "ApiKeyAuth",
+    "AsyncEEExportsEndpoint",
     "AsyncSepalClient",
     "BadRequest",
     "Conflict",
     "CookieAuth",
     "DirectoryListing",
+    "EEExportDestination",
+    "EEExportKind",
+    "EEExportsEndpoint",
     "FileEntry",
     "FileWriteResult",
     "Forbidden",
     "InvalidPathError",
+    "MissingDependency",
     "MissingHostError",
     "NoAuth",
     "NoCredentialsError",
@@ -68,4 +81,5 @@ __all__ = [
     "detect_auth",
     "detect_base_url",
     "normalize_base_url",
+    "serialize_ee_object",
 ]
