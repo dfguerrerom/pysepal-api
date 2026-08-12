@@ -6,25 +6,37 @@ Three providers implement `httpx.Auth`:
 - `CookieAuth`  → `SEPAL-SESSIONID` cookie for Solara/session-header flows.
 - `NoAuth`      → explicitly disable pysepal-api auth (tests / mock servers).
 
-`detect_auth()` follows the spec precedence:
-
-1. `SEPAL_API_KEY` env var.
-2. `/var/run/sepal-api-key` file.
-3. raise `NoCredentialsError`.
+`detect_auth()` resolves the sandbox credential from `/var/run/sepal-api-key`:
+`mode="sandbox_file"`, or the default `"auto"`, which means the same since that
+file is the only source. `mode="none"` disables auth.
 """
 
 from __future__ import annotations
 
 import base64
-import os
 from collections.abc import Generator
 from pathlib import Path
+from typing import Literal, get_args
 
 import httpx
 
 from .errors import NoCredentialsError
 
 SANDBOX_KEY_PATH = "/var/run/sepal-api-key"
+
+AuthMode = Literal["auto", "sandbox_file", "none"]
+
+_AUTH_MODES: frozenset[str] = frozenset(get_args(AuthMode))
+
+
+def _validate_auth_mode(mode: str) -> None:
+    """Raise if `mode` is not a known `AuthMode`.
+
+    Split out of `detect_auth` so the client can reject a bad mode even on the
+    paths where it never resolves one (explicit `auth=` or `session_id=`).
+    """
+    if mode not in _AUTH_MODES:
+        raise ValueError(f"unknown auth mode: {mode!r}")
 
 
 class ApiKeyAuth(httpx.Auth):
@@ -48,13 +60,6 @@ class ApiKeyAuth(httpx.Auth):
     def from_sandbox(cls, path: str = SANDBOX_KEY_PATH) -> "ApiKeyAuth":
         text = Path(path).read_text().strip()
         return cls(text)
-
-    @classmethod
-    def from_env(cls, var: str = "SEPAL_API_KEY") -> "ApiKeyAuth":
-        value = os.environ.get(var, "").strip()
-        if not value:
-            raise NoCredentialsError(f"Environment variable {var} is empty or unset")
-        return cls(value)
 
 
 class CookieAuth(httpx.Auth):
@@ -84,19 +89,30 @@ class NoAuth(httpx.Auth):
 
 def detect_auth(
     *,
-    env_var: str = "SEPAL_API_KEY",
+    mode: AuthMode = "auto",
     sandbox_path: str = SANDBOX_KEY_PATH,
 ) -> httpx.Auth:
-    """Auto-detect auth: env var → key file → NoCredentialsError."""
-    value = os.environ.get(env_var, "").strip()
-    if value:
-        return ApiKeyAuth(value)
-    p = Path(sandbox_path)
-    if p.is_file():
-        text = p.read_text().strip()
-        if text:
-            return ApiKeyAuth(text)
-    raise NoCredentialsError(
-        "No SEPAL credentials found. Pass auth=..., set SEPAL_API_KEY, "
-        f"or ensure {sandbox_path} exists."
-    )
+    """Build an auth provider for the sandbox credential.
+
+    ``mode="none"`` disables auth. ``mode="sandbox_file"`` reads
+    ``sandbox_path``, and ``mode="auto"`` (the default) does the same — the
+    two are separate spellings of one behaviour because there is only one
+    credential source to find. Raises `NoCredentialsError` when the key file is
+    missing or empty.
+    """
+    _validate_auth_mode(mode)
+    if mode == "none":
+        return NoAuth()
+    return _api_key_from_file(sandbox_path)
+
+
+def _api_key_from_file(sandbox_path: str) -> ApiKeyAuth:
+    """Read an API key from ``sandbox_path``; raise if absent or empty."""
+    path = Path(sandbox_path)
+    text = path.read_text().strip() if path.is_file() else ""
+    if not text:
+        raise NoCredentialsError(
+            f"No SEPAL API key at {sandbox_path}. Pass auth=... explicitly when "
+            "running outside a SEPAL sandbox."
+        )
+    return ApiKeyAuth(text)

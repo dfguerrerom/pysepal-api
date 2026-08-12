@@ -5,8 +5,8 @@ surface — same endpoints, same method names, same generic escape hatch. The
 only thing that differs is `await`. Both build on the shared request core in
 `transport.py` and the shared config resolution below.
 
-Construction and `create()` never perform network I/O, so building a client is
-safe anywhere — including a UI render path:
+Construction and `create()` are pure, so building a client is safe anywhere —
+including a UI render path:
 
     with SepalClient(module_name="my_module") as sepal:                    # sync
         sepal.files.list("/")
@@ -14,10 +14,10 @@ safe anywhere — including a UI render path:
     async with AsyncSepalClient.create(module_name="my_module") as sepal:  # async
         await sepal.files.list("/")
 
-`results_path` is derived arithmetically from `module_name`; the directory it
-names does not exist on the server until someone calls `ensure_results_dir()`.
-That is the one setup call that does I/O — make it once at app startup, off
-any render path.
+`results_path` is derived arithmetically from `module_name`, and
+`ensure_results_dir()` creates that directory on the server. It is the one setup
+call that does I/O — make it once at app startup, and before anything writes
+into `results_path`.
 
 For long-lived clients skip the context manager: `sepal = SepalClient.create(...)`
 or `sepal = await AsyncSepalClient.create(...)`, then `close()` / `aclose()`.
@@ -32,7 +32,7 @@ from typing import Any
 
 import httpx
 
-from .auth import CookieAuth, detect_auth
+from .auth import AuthMode, CookieAuth, _validate_auth_mode, detect_auth
 from .endpoints.recipes import AsyncRecipesEndpoint, RecipesEndpoint
 from .endpoints.tasks import AsyncTasksEndpoint, TasksEndpoint
 from .endpoints.user_files import AsyncUserFilesEndpoint, UserFilesEndpoint
@@ -63,17 +63,22 @@ def _should_verify_tls(base_url: str) -> bool:
 def _resolve_config(
     session_id: str | None,
     auth: httpx.Auth | None,
+    auth_mode: AuthMode,
     base_url: str | None,
     verify: bool | None,
 ) -> tuple[str, httpx.Auth, bool]:
     """Resolve base URL, auth, and TLS verification once for both clients.
 
     Auth precedence: explicit `auth=` → `session_id=` (wrapped in CookieAuth)
-    → `detect_auth()`. Host precedence: explicit `base_url=` (a bare host is
-    accepted and normalized to https) → `detect_base_url()`.
+    → `detect_auth(mode=auth_mode)`. Host precedence: explicit `base_url=` (a
+    bare host is accepted and normalized to https) → `detect_base_url()`.
+
+    `auth_mode` is validated up front rather than inside `detect_auth`, so a
+    typo still raises on the two paths that never reach it.
     """
+    _validate_auth_mode(auth_mode)
     resolved_base_url = normalize_base_url(base_url or detect_base_url())
-    resolved_auth = auth or (CookieAuth(session_id) if session_id else detect_auth())
+    resolved_auth = auth or (CookieAuth(session_id) if session_id else detect_auth(mode=auth_mode))
     resolved_verify = verify if verify is not None else _should_verify_tls(resolved_base_url)
     return resolved_base_url, resolved_auth, resolved_verify
 
@@ -89,11 +94,14 @@ class SepalClient:
         session_id: str | None = None,
         module_name: str | None = None,
         auth: httpx.Auth | None = None,
+        auth_mode: AuthMode = "auto",
         base_url: str | None = None,
         timeout: float | httpx.Timeout = 30.0,
         verify: bool | None = None,
     ) -> None:
-        base, resolved_auth, resolved_verify = _resolve_config(session_id, auth, base_url, verify)
+        base, resolved_auth, resolved_verify = _resolve_config(
+            session_id, auth, auth_mode, base_url, verify
+        )
         self.module_name = module_name
         self.base_url = base
         self.verify = resolved_verify
@@ -121,11 +129,12 @@ class SepalClient:
         session_id: str | None = None,
         module_name: str | None = None,
         auth: httpx.Auth | None = None,
+        auth_mode: AuthMode = "auto",
         base_url: str | None = None,
         timeout: float | httpx.Timeout = 30.0,
         verify: bool | None = None,
     ) -> SepalClient:
-        """Build a ready-to-use client. Pure — performs no network I/O.
+        """Build a ready-to-use client. Pure.
 
         ``results_path`` is derived arithmetically from ``module_name``; call
         `ensure_results_dir()` off the UI render path to materialise it.
@@ -134,6 +143,7 @@ class SepalClient:
             session_id=session_id,
             module_name=module_name,
             auth=auth,
+            auth_mode=auth_mode,
             base_url=base_url,
             timeout=timeout,
             verify=verify,
@@ -195,11 +205,14 @@ class AsyncSepalClient:
         session_id: str | None = None,
         module_name: str | None = None,
         auth: httpx.Auth | None = None,
+        auth_mode: AuthMode = "auto",
         base_url: str | None = None,
         timeout: float | httpx.Timeout = 30.0,
         verify: bool | None = None,
     ) -> None:
-        base, resolved_auth, resolved_verify = _resolve_config(session_id, auth, base_url, verify)
+        base, resolved_auth, resolved_verify = _resolve_config(
+            session_id, auth, auth_mode, base_url, verify
+        )
         self.module_name = module_name
         self.base_url = base
         self.verify = resolved_verify
@@ -227,13 +240,13 @@ class AsyncSepalClient:
         session_id: str | None = None,
         module_name: str | None = None,
         auth: httpx.Auth | None = None,
+        auth_mode: AuthMode = "auto",
         base_url: str | None = None,
         timeout: float | httpx.Timeout = 30.0,
         verify: bool | None = None,
     ) -> _AwaitableClient:
-        """Build a ready-to-use client. Pure — performs no network I/O. The
-        result can be awaited *or* used as an async context manager — both
-        spellings work, and neither performs I/O:
+        """Build a ready-to-use client. Pure. The result can be awaited *or*
+        used as an async context manager — both spellings work:
 
             sepal = await AsyncSepalClient.create(...)      # long-lived
             async with AsyncSepalClient.create(...) as sepal:   # scoped
@@ -245,6 +258,7 @@ class AsyncSepalClient:
             session_id=session_id,
             module_name=module_name,
             auth=auth,
+            auth_mode=auth_mode,
             base_url=base_url,
             timeout=timeout,
             verify=verify,
@@ -293,8 +307,7 @@ class AsyncSepalClient:
 
 class _AwaitableClient:
     """Result of `AsyncSepalClient.create()`: awaitable and an async context
-    manager, so `await create(...)` and `async with create(...)` both work.
-    Neither spelling performs I/O."""
+    manager, so `await create(...)` and `async with create(...)` both work."""
 
     def __init__(self, client: AsyncSepalClient) -> None:
         self._client = client
