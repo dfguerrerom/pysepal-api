@@ -33,7 +33,7 @@ from .models import (
 )
 from .paths import module_results_path
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "ApiError",

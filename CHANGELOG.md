@@ -1,3 +1,26 @@
+## v0.3.0 (2026-08-12)
+
+### BREAKING CHANGE
+
+- SepalClient.create() and context entry no longer create the module results
+directory. Nothing was removed or renamed and results_path holds the value it
+always did, so this raises no import or type error — but code that wrote into
+results_path relying on create() having made the directory now fails at write
+time. Call the new ensure_results_dir() once at startup, or mkdir(parents=True)
+yourself. A module_name that would escape module_results/ (absolute, or
+containing ..) is now rejected at construction.
+- removes ApiKeyAuth.from_env and detect_auth's env_var=; nothing in the library
+reads SEPAL_API_KEY any more. SEPAL unsets that variable before user code runs,
+so /var/run/sepal-api-key is the only credential a sandbox has.
+detect_auth(mode="env") and auth_mode="env" now raise; "auto" and
+"sandbox_file" resolve identically. Outside a sandbox pass auth=ApiKeyAuth(key)
+or detect_auth(sandbox_path=...).
+
+### Feat
+
+- name the credential source and drop the SEPAL_API_KEY path
+- make SepalClient.create() pure and move directory creation to ensure_results_dir()
+
 ## v0.2.0 (2026-07-07)
 
 ### BREAKING CHANGE
