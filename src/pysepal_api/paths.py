@@ -19,6 +19,38 @@ from .errors import InvalidPathError
 
 BASE_REMOTE_PATH = "/home/sepal-user"
 
+MODULE_RESULTS_DIR = "module_results"
+
+
+def module_results_relative(module_name: str) -> PurePosixPath:
+    """Home-relative results directory for a module.
+
+    Frozen data-compatibility contract: ``module_name`` is used verbatim and is
+    never rewritten. ``se.plan`` and ``sdg_indicators/15.4.2`` map to the exact
+    directories downstream apps already hardcode; rewriting either would strand
+    every recipe and export a user has already saved.
+
+    Names that would escape ``module_results/`` are rejected rather than
+    rewritten, which keeps that contract intact for every legitimate name. The
+    rejected forms are silent otherwise: an absolute name replaces the prefix
+    outright (``PurePosixPath("module_results") / "/etc"`` is ``/etc``), and
+    ``..`` climbs out of it.
+    """
+    if not module_name:
+        raise InvalidPathError("module_results_relative: module name is empty")
+    relative = PurePosixPath(module_name)
+    if relative.is_absolute():
+        raise InvalidPathError(
+            f"module_results_relative: module name must be relative, got {module_name!r}"
+        )
+    _reject_traversal(relative, origin="module_results_relative")
+    return PurePosixPath(MODULE_RESULTS_DIR) / relative
+
+
+def module_results_path(module_name: str) -> PurePosixPath:
+    """Absolute remote results directory for a module — pure, no I/O."""
+    return PurePosixPath(BASE_REMOTE_PATH) / module_results_relative(module_name)
+
 
 def _reject_traversal(path: PurePosixPath, *, origin: str) -> None:
     """Raise if `path` contains a `..` component."""

@@ -1,6 +1,6 @@
 """pysepal-api — UI-free HTTP client for SEPAL services."""
 
-from .auth import ApiKeyAuth, CookieAuth, NoAuth, detect_auth
+from .auth import ApiKeyAuth, AuthMode, CookieAuth, NoAuth, detect_auth
 from .client import AsyncSepalClient, SepalClient
 from .errors import (
     ApiError,
@@ -31,6 +31,7 @@ from .models import (
     Task,
     TaskState,
 )
+from .paths import module_results_path
 
 __version__ = "0.2.0"
 
@@ -38,6 +39,7 @@ __all__ = [
     "ApiError",
     "ApiKeyAuth",
     "AsyncSepalClient",
+    "AuthMode",
     "BadRequest",
     "Conflict",
     "CookieAuth",
@@ -67,5 +69,6 @@ __all__ = [
     "__version__",
     "detect_auth",
     "detect_base_url",
+    "module_results_path",
     "normalize_base_url",
 ]

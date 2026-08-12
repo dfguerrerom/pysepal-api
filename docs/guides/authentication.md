@@ -10,7 +10,6 @@ from pysepal_api import ApiKeyAuth, CookieAuth, NoAuth, SepalClient
 
 # API key (HTTP Basic with the sandbox key as the password)
 SepalClient(auth=ApiKeyAuth("my-api-key"))
-SepalClient(auth=ApiKeyAuth.from_env("SEPAL_API_KEY"))
 SepalClient(auth=ApiKeyAuth.from_sandbox())        # reads the sandbox key file
 
 # Session cookie (Solara container path)
@@ -21,16 +20,41 @@ SepalClient(session_id="SEPAL-SESSIONID-value")     # shorthand for CookieAuth
 SepalClient(auth=NoAuth())
 ```
 
-## Auto-detection
+## Resolving credentials for you
 
-`detect_auth()` picks credentials in order: the `SEPAL_API_KEY` env var, then the
-sandbox key file, else it raises `NoCredentialsError`.
+If you pass neither `auth` nor `session_id`, the client calls `detect_auth()`,
+which reads the sandbox key file at `/var/run/sepal-api-key` and raises
+`NoCredentialsError` if it isn't there.
 
 ```python
 from pysepal_api import detect_auth, SepalClient
 
-sepal = SepalClient(auth=detect_auth())
+sepal = SepalClient()                       # resolves auth for you
+sepal = SepalClient(auth=detect_auth())     # the same thing, spelled out
 ```
 
-If you pass neither `auth` nor `session_id`, the client resolves auth for you
-using the same detection logic.
+`auth_mode=` (and `detect_auth(mode=)`) names what to resolve:
+
+```python
+# The sandbox key file. "auto" is the default and means the same thing.
+sepal = SepalClient(module_name="my_module", auth_mode="sandbox_file")
+
+# No credentials at all (e.g. hitting an unauthenticated route).
+sepal = SepalClient(auth_mode="none")
+```
+
+For a Solara app serving several users from one container, don't reach for
+`auth_mode` at all — pass each user's own `session_id=` and the client uses
+`CookieAuth`.
+
+## Outside a SEPAL sandbox
+
+`/var/run/sepal-api-key` is a sandbox path, so off-sandbox you supply the
+credential yourself:
+
+```python
+from pysepal_api import ApiKeyAuth, SepalClient, detect_auth
+
+sepal = SepalClient(auth=ApiKeyAuth(my_key))                    # a key you hold
+sepal = SepalClient(auth=detect_auth(sandbox_path="/tmp/key"))  # your own file
+```

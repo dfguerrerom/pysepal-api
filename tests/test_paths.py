@@ -4,6 +4,8 @@ import pytest
 
 from pysepal_api.paths import (
     BASE_REMOTE_PATH,
+    module_results_path,
+    module_results_relative,
     normalize_list_folder,
     sanitize_write_path,
 )
@@ -74,3 +76,16 @@ def test_path_errors_are_pysepal_and_value_errors() -> None:
             sanitize_write_path(bad)
     with pytest.raises(PysepalError):
         normalize_list_folder("../../etc")
+
+
+@pytest.mark.parametrize("module_name", ["/etc/passwd", "../escape", "a/../../b", ""])
+def test_module_results_rejects_names_that_escape_the_results_dir(module_name: str) -> None:
+    """`PurePosixPath("module_results") / "/etc"` is `/etc` — an absolute or
+    traversing name silently drops out of the sandbox, so reject it here rather
+    than let it reach `results_path`."""
+    from pysepal_api.errors import InvalidPathError
+
+    with pytest.raises(InvalidPathError):
+        module_results_relative(module_name)
+    with pytest.raises(InvalidPathError):
+        module_results_path(module_name)

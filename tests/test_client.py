@@ -2,7 +2,7 @@ import httpx
 import pytest
 import respx
 
-from pysepal_api import NotFound, SepalClient, Unauthorized
+from pysepal_api import NotFound, SepalClient
 from pysepal_api.auth import NoAuth
 from pysepal_api.errors import MissingHostError
 
@@ -18,35 +18,14 @@ def test_client_uses_explicit_base_url_and_auth() -> None:
 
 
 def test_init_performs_no_network() -> None:
-    """Constructing with a module_name must NOT hit the network — only
-    create()/context-entry create the results dir. (No respx mock here: if
-    __init__ issued a request it would error.)"""
+    """Constructing with a module_name must NOT hit the network — `results_path`
+    is derived arithmetically. (No respx mock here: if __init__ issued a
+    request it would error.)"""
     client = SepalClient(base_url="https://sepal.test", auth=NoAuth(), module_name="demo")
     try:
-        assert client.results_path is None
+        assert str(client.results_path) == "/home/sepal-user/module_results/demo"
     finally:
         client.close()
-
-
-def test_create_factory_makes_module_dir() -> None:
-    with respx.mock(base_url="https://sepal.test") as mock:
-        mock.post("/api/user-files/createFolder").respond(200, json={})
-        client = SepalClient.create(
-            base_url="https://sepal.test", auth=NoAuth(), module_name="demo"
-        )
-        try:
-            assert str(client.results_path) == "/home/sepal-user/module_results/demo"
-        finally:
-            client.close()
-
-
-def test_context_manager_creates_module_dir() -> None:
-    with respx.mock(base_url="https://sepal.test") as mock:
-        mock.post("/api/user-files/createFolder").respond(200, json={})
-        with SepalClient(
-            base_url="https://sepal.test", auth=NoAuth(), module_name="demo"
-        ) as client:
-            assert str(client.results_path) == "/home/sepal-user/module_results/demo"
 
 
 def test_client_wraps_session_id_in_cookie_auth() -> None:
@@ -145,42 +124,3 @@ def test_verify_env_opt_in_is_host_scoped(monkeypatch: pytest.MonkeyPatch) -> No
             assert client.verify is expected, host
         finally:
             client.close()
-
-
-def test_create_closes_client_if_module_dir_fails(monkeypatch: pytest.MonkeyPatch) -> None:
-    """create() must not leak the open httpx client when module-dir creation
-    raises (here a 401 — not swallowed by mkdir, which only eats 409/403)."""
-    closed = {"n": 0}
-    real_close = SepalClient.close
-
-    def spy(self: SepalClient) -> None:
-        closed["n"] += 1
-        real_close(self)
-
-    monkeypatch.setattr(SepalClient, "close", spy)
-    with respx.mock(base_url="https://sepal.test") as mock:
-        mock.post("/api/user-files/createFolder").respond(401, text="nope")
-        with pytest.raises(Unauthorized):
-            SepalClient.create(base_url="https://sepal.test", auth=NoAuth(), module_name="demo")
-    assert closed["n"] == 1
-
-
-def test_context_manager_closes_client_if_module_dir_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Same leak guard as create(), but via the `with` path — __exit__ is never
-    called when __enter__ raises, so __enter__ must close on failure itself."""
-    closed = {"n": 0}
-    real_close = SepalClient.close
-
-    def spy(self: SepalClient) -> None:
-        closed["n"] += 1
-        real_close(self)
-
-    monkeypatch.setattr(SepalClient, "close", spy)
-    with respx.mock(base_url="https://sepal.test") as mock:
-        mock.post("/api/user-files/createFolder").respond(401, text="nope")
-        with pytest.raises(Unauthorized):
-            with SepalClient(base_url="https://sepal.test", auth=NoAuth(), module_name="demo"):
-                pass
-    assert closed["n"] == 1
