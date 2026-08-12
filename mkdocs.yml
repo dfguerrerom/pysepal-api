@@ -65,6 +65,7 @@ nav:
       - Endpoints: reference/endpoints.md
       - Models: reference/models.md
       - Auth: reference/auth.md
+      - Paths: reference/paths.md
       - Host: reference/host.md
       - Errors: reference/errors.md
   - Changelog: changelog.md

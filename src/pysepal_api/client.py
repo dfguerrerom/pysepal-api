@@ -5,14 +5,19 @@ surface — same endpoints, same method names, same generic escape hatch. The
 only thing that differs is `await`. Both build on the shared request core in
 `transport.py` and the shared config resolution below.
 
-Construction never performs network I/O; entering the context (or awaiting
-`create()`) is what eagerly creates the module results directory:
+Construction and `create()` never perform network I/O, so building a client is
+safe anywhere — including a UI render path:
 
     with SepalClient(module_name="my_module") as sepal:                    # sync
         sepal.files.list("/")
 
     async with AsyncSepalClient.create(module_name="my_module") as sepal:  # async
         await sepal.files.list("/")
+
+`results_path` is derived arithmetically from `module_name`; the directory it
+names does not exist on the server until someone calls `ensure_results_dir()`.
+That is the one setup call that does I/O — make it once at app startup, off
+any render path.
 
 For long-lived clients skip the context manager: `sepal = SepalClient.create(...)`
 or `sepal = await AsyncSepalClient.create(...)`, then `close()` / `aclose()`.
@@ -32,7 +37,7 @@ from .endpoints.recipes import AsyncRecipesEndpoint, RecipesEndpoint
 from .endpoints.tasks import AsyncTasksEndpoint, TasksEndpoint
 from .endpoints.user_files import AsyncUserFilesEndpoint, UserFilesEndpoint
 from .host import detect_base_url, normalize_base_url
-from .paths import BASE_REMOTE_PATH
+from .paths import BASE_REMOTE_PATH, module_results_path
 from .transport import send_with_error_mapping, send_with_error_mapping_async
 
 # Hosts that legitimately serve self-signed certs in local development. TLS
@@ -92,7 +97,9 @@ class SepalClient:
         self.module_name = module_name
         self.base_url = base
         self.verify = resolved_verify
-        self.results_path: PurePosixPath | None = None
+        self.results_path: PurePosixPath | None = (
+            module_results_path(module_name) if module_name else None
+        )
         self._http = httpx.Client(
             base_url=base,
             auth=resolved_auth,
@@ -118,10 +125,12 @@ class SepalClient:
         timeout: float | httpx.Timeout = 30.0,
         verify: bool | None = None,
     ) -> SepalClient:
-        """Build a ready-to-use client, eagerly creating the module results dir
-        (if `module_name` is given). Entry point for long-lived clients; for
-        scoped use, `with SepalClient(...)` does the same setup on entry."""
-        client = cls(
+        """Build a ready-to-use client. Pure — performs no network I/O.
+
+        ``results_path`` is derived arithmetically from ``module_name``; call
+        `ensure_results_dir()` off the UI render path to materialise it.
+        """
+        return cls(
             session_id=session_id,
             module_name=module_name,
             auth=auth,
@@ -129,21 +138,18 @@ class SepalClient:
             timeout=timeout,
             verify=verify,
         )
-        return client._setup()
 
-    def _setup(self) -> SepalClient:
-        """Run eager setup, closing the client instead of leaking it on failure."""
-        try:
-            self._ensure_results_path()
-        except BaseException:
-            self.close()
-            raise
-        return self
+    def ensure_results_dir(self) -> PurePosixPath | None:
+        """Create the module results directory on the server.
 
-    def _ensure_results_path(self) -> PurePosixPath | None:
-        if self.results_path is None and self.module_name:
-            self.results_path = self.files.module_dir(self.module_name)
-        return self.results_path
+        Network I/O — never call this on a UI render path, and call it once at
+        startup rather than before every write: it re-issues the request each
+        time. Returns the absolute results path, or ``None`` when the client
+        has no ``module_name``. Idempotent: `files.mkdir` swallows 409/403.
+        """
+        if not self.module_name:
+            return None
+        return self.files.module_dir(self.module_name)
 
     def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
         """Issue an arbitrary authenticated request to any SEPAL route.
@@ -172,7 +178,7 @@ class SepalClient:
         self._http.close()
 
     def __enter__(self) -> SepalClient:
-        return self._setup()
+        return self
 
     def __exit__(self, *exc: Any) -> None:
         self.close()
@@ -197,7 +203,9 @@ class AsyncSepalClient:
         self.module_name = module_name
         self.base_url = base
         self.verify = resolved_verify
-        self.results_path: PurePosixPath | None = None
+        self.results_path: PurePosixPath | None = (
+            module_results_path(module_name) if module_name else None
+        )
         self._http = httpx.AsyncClient(
             base_url=base,
             auth=resolved_auth,
@@ -223,12 +231,15 @@ class AsyncSepalClient:
         timeout: float | httpx.Timeout = 30.0,
         verify: bool | None = None,
     ) -> _AwaitableClient:
-        """Build a ready-to-use client, eagerly creating the module results dir
-        (if `module_name` is given). The result can be awaited *or* used as an
-        async context manager — both spellings work:
+        """Build a ready-to-use client. Pure — performs no network I/O. The
+        result can be awaited *or* used as an async context manager — both
+        spellings work, and neither performs I/O:
 
             sepal = await AsyncSepalClient.create(...)      # long-lived
             async with AsyncSepalClient.create(...) as sepal:   # scoped
+
+        ``results_path`` is derived arithmetically from ``module_name``; call
+        `ensure_results_dir()` off the UI render path to materialise it.
         """
         client = cls(
             session_id=session_id,
@@ -240,19 +251,17 @@ class AsyncSepalClient:
         )
         return _AwaitableClient(client)
 
-    async def _setup(self) -> AsyncSepalClient:
-        """Run eager setup, closing the client instead of leaking it on failure."""
-        try:
-            await self._ensure_results_path()
-        except BaseException:
-            await self.aclose()
-            raise
-        return self
+    async def ensure_results_dir(self) -> PurePosixPath | None:
+        """Create the module results directory on the server.
 
-    async def _ensure_results_path(self) -> PurePosixPath | None:
-        if self.results_path is None and self.module_name:
-            self.results_path = await self.files.module_dir(self.module_name)
-        return self.results_path
+        Network I/O — never call this on a UI render path, and call it once at
+        startup rather than before every write: it re-issues the request each
+        time. Returns the absolute results path, or ``None`` when the client
+        has no ``module_name``. Idempotent: `files.mkdir` swallows 409/403.
+        """
+        if not self.module_name:
+            return None
+        return await self.files.module_dir(self.module_name)
 
     async def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
         """Async twin of `SepalClient.request`. Escape hatch for unmodeled routes."""
@@ -276,7 +285,7 @@ class AsyncSepalClient:
         await self._http.aclose()
 
     async def __aenter__(self) -> AsyncSepalClient:
-        return await self._setup()
+        return self
 
     async def __aexit__(self, *exc: Any) -> None:
         await self.aclose()
@@ -284,16 +293,20 @@ class AsyncSepalClient:
 
 class _AwaitableClient:
     """Result of `AsyncSepalClient.create()`: awaitable and an async context
-    manager, so `await create(...)` and `async with create(...)` both work."""
+    manager, so `await create(...)` and `async with create(...)` both work.
+    Neither spelling performs I/O."""
 
     def __init__(self, client: AsyncSepalClient) -> None:
         self._client = client
 
+    async def _ready(self) -> AsyncSepalClient:
+        return self._client
+
     def __await__(self) -> Generator[Any, None, AsyncSepalClient]:
-        return self._client._setup().__await__()
+        return self._ready().__await__()
 
     async def __aenter__(self) -> AsyncSepalClient:
-        return await self._client._setup()
+        return self._client
 
     async def __aexit__(self, *exc: Any) -> None:
         await self._client.aclose()

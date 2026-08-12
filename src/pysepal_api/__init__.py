@@ -31,6 +31,7 @@ from .models import (
     Task,
     TaskState,
 )
+from .paths import module_results_path
 
 __version__ = "0.2.0"
 
@@ -67,5 +68,6 @@ __all__ = [
     "__version__",
     "detect_auth",
     "detect_base_url",
+    "module_results_path",
     "normalize_base_url",
 ]

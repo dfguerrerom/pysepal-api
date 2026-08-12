@@ -23,7 +23,12 @@ from typing import Any
 
 from ..errors import Conflict, Forbidden
 from ..models import DirectoryListing, FileWriteResult
-from ..paths import BASE_REMOTE_PATH, normalize_list_folder, sanitize_write_path
+from ..paths import (
+    module_results_path,
+    module_results_relative,
+    normalize_list_folder,
+    sanitize_write_path,
+)
 from ..transport import RequestSpec, parse_one
 from ..transport import parse_json as _parse_json
 from ._base import _AsyncEndpoint, _SyncEndpoint
@@ -81,10 +86,6 @@ def _mkdir_spec(path: str, parents: bool) -> RequestSpec:
     )
 
 
-def _module_dir_relative(module_name: str) -> PurePosixPath:
-    return PurePosixPath("module_results") / module_name
-
-
 class UserFilesEndpoint(_SyncEndpoint):
     def list(
         self,
@@ -139,9 +140,8 @@ class UserFilesEndpoint(_SyncEndpoint):
 
     def module_dir(self, module_name: str) -> PurePosixPath:
         """Create and return `/home/sepal-user/module_results/{module_name}`."""
-        relative = _module_dir_relative(module_name)
-        self.mkdir(str(relative), parents=True)
-        return PurePosixPath(BASE_REMOTE_PATH) / relative
+        self.mkdir(str(module_results_relative(module_name)), parents=True)
+        return module_results_path(module_name)
 
 
 class AsyncUserFilesEndpoint(_AsyncEndpoint):
@@ -183,6 +183,5 @@ class AsyncUserFilesEndpoint(_AsyncEndpoint):
         return relative
 
     async def module_dir(self, module_name: str) -> PurePosixPath:
-        relative = _module_dir_relative(module_name)
-        await self.mkdir(str(relative), parents=True)
-        return PurePosixPath(BASE_REMOTE_PATH) / relative
+        await self.mkdir(str(module_results_relative(module_name)), parents=True)
+        return module_results_path(module_name)
