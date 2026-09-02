@@ -1,3 +1,9 @@
+## v0.3.1 (2026-09-02)
+
+### Fix
+
+- ship the MIT LICENSE file in sdist and wheel
+
 ## v0.3.0 (2026-08-12)
 
 ### BREAKING CHANGE
