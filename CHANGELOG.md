@@ -1,3 +1,16 @@
+## v0.4.0 (2026-10-20)
+
+### Feat
+
+- Add sync and async Earth Engine image and table exports through SEPAL TaskManager.
+- Expose `EEExportDestination` and optional Earth Engine serialization via `pysepal-api[ee]`.
+- Add a notebook with synchronous and asynchronous export examples.
+
+### Requirements
+
+- Earth Engine exports require the SEPAL `ee.export` backend adapter
+  ([openforis/sepal#454](https://github.com/openforis/sepal/pull/454)).
+
 ## v0.3.1 (2026-09-02)
 
 ### Fix
