@@ -62,6 +62,15 @@ class ServerError(ApiError):
     pass
 
 
+class MissingDependency(PysepalError):
+    """An optional dependency needed for a feature is not installed.
+
+    Raised when a code path needs a package from an extra (e.g. ``ee`` from
+    ``pysepal-api[ee]``) that was not installed. The message carries the
+    ``pip install`` hint to remedy it.
+    """
+
+
 class TransportError(PysepalError):
     """Network/send failure: DNS, connection, timeout, etc."""
 
