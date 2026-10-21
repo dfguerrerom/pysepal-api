@@ -94,4 +94,5 @@ Notes:
 - `destination="GEE"` requires `asset_id`; omitting it raises `ValueError` before any network call.
 - `image` / `collection` / `region` accept either a live EE object (encoded for you) or an already-encoded Cloud API expression dict (no `[ee]` extra needed).
 - Table `max_vertices` is supported by the current backend only for Drive exports. ImageCollection asset exports require SEPAL's tiled recipe workflow.
+- SEPAL's task list shows where each export came from: the notebook or script path (relative to your home directory), the app, or "Sandbox". Apps name themselves with `SepalClient(..., app_name="se.plan")`; without it, a client signed in with `session_id` shows as "App".
 - The async twin `AsyncSepalClient.ee_exports` has the identical surface, differing only by `await`.
