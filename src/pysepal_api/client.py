@@ -38,6 +38,7 @@ from .endpoints.recipes import AsyncRecipesEndpoint, RecipesEndpoint
 from .endpoints.tasks import AsyncTasksEndpoint, TasksEndpoint
 from .endpoints.user_files import AsyncUserFilesEndpoint, UserFilesEndpoint
 from .host import detect_base_url, normalize_base_url
+from .origin import detect_origin
 from .paths import BASE_REMOTE_PATH, module_results_path
 from .transport import send_with_error_mapping, send_with_error_mapping_async
 
@@ -99,6 +100,7 @@ class SepalClient:
         base_url: str | None = None,
         timeout: float | httpx.Timeout = 30.0,
         verify: bool | None = None,
+        app_name: str | None = None,
     ) -> None:
         base, resolved_auth, resolved_verify = _resolve_config(
             session_id, auth, auth_mode, base_url, verify
@@ -119,7 +121,12 @@ class SepalClient:
         self.files = UserFilesEndpoint(self._http)
         self.tasks = TasksEndpoint(self._http)
         self.recipes = RecipesEndpoint(self._http)
-        self.ee_exports = EEExportsEndpoint(self.tasks)
+        self.ee_exports = EEExportsEndpoint(
+            self.tasks,
+            origin=detect_origin(
+                app_name=app_name, browser_session=isinstance(resolved_auth, CookieAuth)
+            ),
+        )
         self.exports = self.ee_exports
 
     def __repr__(self) -> str:
@@ -136,6 +143,7 @@ class SepalClient:
         base_url: str | None = None,
         timeout: float | httpx.Timeout = 30.0,
         verify: bool | None = None,
+        app_name: str | None = None,
     ) -> SepalClient:
         """Build a ready-to-use client. Pure.
 
@@ -150,6 +158,7 @@ class SepalClient:
             base_url=base_url,
             timeout=timeout,
             verify=verify,
+            app_name=app_name,
         )
 
     def ensure_results_dir(self) -> PurePosixPath | None:
@@ -212,6 +221,7 @@ class AsyncSepalClient:
         base_url: str | None = None,
         timeout: float | httpx.Timeout = 30.0,
         verify: bool | None = None,
+        app_name: str | None = None,
     ) -> None:
         base, resolved_auth, resolved_verify = _resolve_config(
             session_id, auth, auth_mode, base_url, verify
@@ -232,7 +242,12 @@ class AsyncSepalClient:
         self.files = AsyncUserFilesEndpoint(self._http)
         self.tasks = AsyncTasksEndpoint(self._http)
         self.recipes = AsyncRecipesEndpoint(self._http)
-        self.ee_exports = AsyncEEExportsEndpoint(self.tasks)
+        self.ee_exports = AsyncEEExportsEndpoint(
+            self.tasks,
+            origin=detect_origin(
+                app_name=app_name, browser_session=isinstance(resolved_auth, CookieAuth)
+            ),
+        )
         self.exports = self.ee_exports
 
     def __repr__(self) -> str:
@@ -249,6 +264,7 @@ class AsyncSepalClient:
         base_url: str | None = None,
         timeout: float | httpx.Timeout = 30.0,
         verify: bool | None = None,
+        app_name: str | None = None,
     ) -> _AwaitableClient:
         """Build a ready-to-use client. Pure. The result can be awaited *or*
         used as an async context manager — both spellings work:
@@ -267,6 +283,7 @@ class AsyncSepalClient:
             base_url=base_url,
             timeout=timeout,
             verify=verify,
+            app_name=app_name,
         )
         return _AwaitableClient(client)
 

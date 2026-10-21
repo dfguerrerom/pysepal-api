@@ -89,6 +89,7 @@ def _build_params(
     destination: EEExportDestination,
     name: str,
     export_fields: Mapping[str, Any],
+    origin: Mapping[str, str] | None,
 ) -> dict[str, Any]:
     """Assemble the ``params`` block for a ``ee.export`` task.
 
@@ -101,16 +102,19 @@ def _build_params(
         "destination": destination.value,
         **_clean(export_fields),
     }
+    task_info: dict[str, Any] = {
+        "destination": destination.value,
+        "outputPath": _resolve_output_path(export, name),
+        "source": _SOURCE,
+        "kind": kind.value,
+    }
+    if origin:
+        task_info["origin"] = dict(origin)
     return {
         "title": f"Export {name} to {destination.value}",
         "description": name,
         "export": export,
-        "taskInfo": {
-            "destination": destination.value,
-            "outputPath": _resolve_output_path(export, name),
-            "source": _SOURCE,
-            "kind": kind.value,
-        },
+        "taskInfo": task_info,
     }
 
 
@@ -218,6 +222,7 @@ def _image_params(
     workspace_path: str | None = None,
     drive_folder: str | None = None,
     filename_prefix: str | None = None,
+    origin: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     dest = _coerce_destination(destination)
     _require_asset_id(dest, asset_id)
@@ -245,7 +250,11 @@ def _image_params(
         filename_prefix=filename_prefix,
     )
     return _build_params(
-        kind=EEExportKind.IMAGE, destination=dest, name=name, export_fields=export_fields
+        kind=EEExportKind.IMAGE,
+        destination=dest,
+        name=name,
+        export_fields=export_fields,
+        origin=origin,
     )
 
 
@@ -262,6 +271,7 @@ def _table_params(
     selectors: list[str] | None = None,
     max_vertices: int | None = None,
     strategy: str | None = None,
+    origin: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     dest = _coerce_destination(destination)
     _require_asset_id(dest, asset_id)
@@ -277,15 +287,20 @@ def _table_params(
         strategy=strategy,
     )
     return _build_params(
-        kind=EEExportKind.TABLE, destination=dest, name=name, export_fields=export_fields
+        kind=EEExportKind.TABLE,
+        destination=dest,
+        name=name,
+        export_fields=export_fields,
+        origin=origin,
     )
 
 
 class EEExportsEndpoint:
     """Submit Earth Engine image/table exports through SEPAL TaskManager (sync)."""
 
-    def __init__(self, tasks: TasksEndpoint) -> None:
+    def __init__(self, tasks: TasksEndpoint, *, origin: Mapping[str, str] | None = None) -> None:
         self._tasks = tasks
+        self._origin = origin
 
     def submit_image(
         self,
@@ -339,6 +354,7 @@ class EEExportsEndpoint:
             workspace_path=workspace_path,
             drive_folder=drive_folder,
             filename_prefix=filename_prefix,
+            origin=self._origin,
         )
         return self._tasks.submit("ee.export", params, instance_type=instance_type)
 
@@ -370,6 +386,7 @@ class EEExportsEndpoint:
             selectors=selectors,
             max_vertices=max_vertices,
             strategy=strategy,
+            origin=self._origin,
         )
         return self._tasks.submit("ee.export", params, instance_type=instance_type)
 
@@ -377,8 +394,11 @@ class EEExportsEndpoint:
 class AsyncEEExportsEndpoint:
     """Submit Earth Engine image/table exports through SEPAL TaskManager (async)."""
 
-    def __init__(self, tasks: AsyncTasksEndpoint) -> None:
+    def __init__(
+        self, tasks: AsyncTasksEndpoint, *, origin: Mapping[str, str] | None = None
+    ) -> None:
         self._tasks = tasks
+        self._origin = origin
 
     async def submit_image(
         self,
@@ -432,6 +452,7 @@ class AsyncEEExportsEndpoint:
             workspace_path=workspace_path,
             drive_folder=drive_folder,
             filename_prefix=filename_prefix,
+            origin=self._origin,
         )
         return await self._tasks.submit("ee.export", params, instance_type=instance_type)
 
@@ -463,5 +484,6 @@ class AsyncEEExportsEndpoint:
             selectors=selectors,
             max_vertices=max_vertices,
             strategy=strategy,
+            origin=self._origin,
         )
         return await self._tasks.submit("ee.export", params, instance_type=instance_type)
