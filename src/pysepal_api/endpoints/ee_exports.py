@@ -18,6 +18,7 @@ it is missing.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from enum import Enum
 from typing import Any
@@ -102,12 +103,15 @@ def _build_params(
         "destination": destination.value,
         **_clean(export_fields),
     }
-    task_info: dict[str, Any] = {
-        "destination": destination.value,
-        "outputPath": _resolve_output_path(export, name),
-        "source": _SOURCE,
-        "kind": kind.value,
-    }
+    task_info: dict[str, Any] = _clean(
+        {
+            "destination": destination.value,
+            "outputPath": _resolve_output_path(export, name),
+            "filenamePrefix": export.get("filenamePrefix"),
+            "source": _SOURCE,
+            "kind": kind.value,
+        }
+    )
     if origin:
         task_info["origin"] = dict(origin)
     return {
@@ -192,6 +196,21 @@ def _table_export_fields(
     }
 
 
+def _drive_folder(
+    destination: EEExportDestination, drive_folder: str | None, name: str
+) -> str | None:
+    if destination is EEExportDestination.DRIVE and not drive_folder:
+        return _drive_folder_name(name)
+    return drive_folder
+
+
+# Mirrors SEPAL's `exportFolderName`, so the default folder is the one SEPAL writes to and the
+# task list shows. SEPAL picks the default workspace folder itself.
+def _drive_folder_name(name: str) -> str:
+    folder = re.sub(r'[/\\"]', "_", name).strip()
+    return "export" if folder in ("", ".", "..") else folder
+
+
 def _require_asset_id(destination: EEExportDestination, asset_id: str | None) -> None:
     if destination is EEExportDestination.GEE and not asset_id:
         raise ValueError("asset_id is required when destination is GEE")
@@ -226,6 +245,7 @@ def _image_params(
 ) -> dict[str, Any]:
     dest = _coerce_destination(destination)
     _require_asset_id(dest, asset_id)
+    drive_folder = _drive_folder(dest, drive_folder, name)
     export_fields = _image_export_fields(
         image=image,
         region=region,
@@ -275,6 +295,7 @@ def _table_params(
 ) -> dict[str, Any]:
     dest = _coerce_destination(destination)
     _require_asset_id(dest, asset_id)
+    drive_folder = _drive_folder(dest, drive_folder, name)
     export_fields = _table_export_fields(
         collection=collection,
         asset_id=asset_id,

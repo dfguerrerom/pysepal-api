@@ -90,7 +90,7 @@ with SepalClient(session_id="...", module_name="my_module") as sepal:
 
 Notes:
 
-- `workspace_path` is **relative to your SEPAL home directory** — never pass an absolute path (the worker rejects `..` traversal).
+- `workspace_path` is **relative to your SEPAL home directory** — never pass an absolute path (the worker rejects `..` traversal). Without it, files go to `downloads/<name>`; without `drive_folder`, Drive exports go to a folder named after the export.
 - `destination="GEE"` requires `asset_id`; omitting it raises `ValueError` before any network call.
 - `image` / `collection` / `region` accept either a live EE object (encoded for you) or an already-encoded Cloud API expression dict (no `[ee]` extra needed).
 - Table `max_vertices` is supported by the current backend only for Drive exports. ImageCollection asset exports require SEPAL's tiled recipe workflow.
