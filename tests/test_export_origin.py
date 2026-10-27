@@ -4,6 +4,7 @@ where it came from: the notebook, script or app that submitted it."""
 import json
 import sys
 import types
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -11,21 +12,24 @@ import respx
 
 from pysepal_api import AsyncSepalClient, NoAuth, SepalClient
 
-HOME = "/home/alice"
-
 
 @pytest.fixture(autouse=True)
-def sandbox(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A sandbox with no notebook, script or app context unless a test adds one."""
-    monkeypatch.setenv("HOME", HOME)
+def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A sandbox working in the home folder, with no notebook, script or app
+    context unless a test adds one."""
+    home = tmp_path / "alice"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.chdir(home)
     monkeypatch.delenv("JPY_SESSION_NAME", raising=False)
     monkeypatch.setitem(sys.modules, "__main__", types.ModuleType("__main__"))
+    return home
 
 
 def test_notebook_export_names_the_notebook_relative_to_home(
-    monkeypatch: pytest.MonkeyPatch,
+    home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("JPY_SESSION_NAME", f"{HOME}/module_results/2024/analysis.ipynb")
+    monkeypatch.setenv("JPY_SESSION_NAME", f"{home}/module_results/2024/analysis.ipynb")
 
     origin = submitted_origin(SepalClient(base_url="https://sepal.test", auth=NoAuth()))
 
@@ -42,16 +46,16 @@ def test_notebook_path_already_relative_to_the_jupyter_root_is_kept(
     assert origin == {"type": "NOTEBOOK", "path": "work/analysis.ipynb"}
 
 
-def test_vscode_notebook_export_names_the_notebook() -> None:
-    sys.modules["__main__"].__vsc_ipynb_file__ = f"{HOME}/work/explore.ipynb"  # type: ignore[attr-defined]
+def test_vscode_notebook_export_names_the_notebook(home: Path) -> None:
+    sys.modules["__main__"].__vsc_ipynb_file__ = f"{home}/work/explore.ipynb"  # type: ignore[attr-defined]
 
     origin = submitted_origin(SepalClient(base_url="https://sepal.test", auth=NoAuth()))
 
     assert origin == {"type": "NOTEBOOK", "path": "work/explore.ipynb"}
 
 
-def test_script_export_names_the_script_relative_to_home() -> None:
-    sys.modules["__main__"].__file__ = f"{HOME}/scripts/export.py"
+def test_script_export_names_the_script_relative_to_home(home: Path) -> None:
+    sys.modules["__main__"].__file__ = f"{home}/scripts/export.py"
 
     origin = submitted_origin(SepalClient(base_url="https://sepal.test", auth=NoAuth()))
 
@@ -66,25 +70,64 @@ def test_script_outside_home_keeps_its_absolute_path() -> None:
     assert origin == {"type": "SCRIPT", "path": "/opt/jobs/export.py"}
 
 
-def test_app_signed_in_with_a_browser_session_is_an_app() -> None:
+def test_app_signed_in_with_a_browser_session_is_named_after_its_module() -> None:
+    origin = submitted_origin(
+        SepalClient(base_url="https://sepal.test", session_id="sid-xyz", module_name="se_plan")
+    )
+
+    assert origin == {"type": "APP", "name": "se_plan"}
+
+
+def test_app_without_a_name_or_module_names_its_working_directory(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(make_dir(home / "apps" / "planner"))
+
     origin = submitted_origin(SepalClient(base_url="https://sepal.test", session_id="sid-xyz"))
 
-    assert origin == {"type": "APP"}
+    assert origin == {"type": "APP", "path": "apps/planner"}
 
 
-def test_app_name_identifies_the_app_over_any_notebook_context(
-    monkeypatch: pytest.MonkeyPatch,
+def test_app_name_identifies_the_app_over_its_module_and_any_notebook(
+    home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("JPY_SESSION_NAME", f"{HOME}/apps/ui.ipynb")
+    monkeypatch.setenv("JPY_SESSION_NAME", f"{home}/apps/ui.ipynb")
 
     origin = submitted_origin(
-        SepalClient.create(base_url="https://sepal.test", auth=NoAuth(), app_name="se.plan")
+        SepalClient.create(
+            base_url="https://sepal.test",
+            session_id="sid-xyz",
+            module_name="se_plan",
+            app_name="se.plan",
+        )
     )
 
     assert origin == {"type": "APP", "name": "se.plan"}
 
 
-def test_export_without_notebook_script_or_app_comes_from_the_sandbox() -> None:
+def test_sandbox_export_without_notebook_or_script_names_its_working_directory(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(make_dir(home / "work"))
+
+    origin = submitted_origin(SepalClient(base_url="https://sepal.test", auth=NoAuth()))
+
+    assert origin == {"type": "SANDBOX", "path": "work"}
+
+
+def test_sandbox_export_from_the_home_folder_names_it_as_the_current_directory() -> None:
+    origin = submitted_origin(SepalClient(base_url="https://sepal.test", auth=NoAuth()))
+
+    assert origin == {"type": "SANDBOX", "path": "."}
+
+
+def test_sandbox_export_from_a_deleted_working_directory_has_no_path(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    gone = make_dir(home / "gone")
+    monkeypatch.chdir(gone)
+    gone.rmdir()
+
     origin = submitted_origin(SepalClient(base_url="https://sepal.test", auth=NoAuth()))
 
     assert origin == {"type": "SANDBOX"}
@@ -115,3 +158,8 @@ def submitted_origin(client: SepalClient) -> Any:
 
 def task_info(route: respx.Route) -> Any:
     return json.loads(route.calls.last.request.content)["params"]["taskInfo"]
+
+
+def make_dir(path: Path) -> Path:
+    path.mkdir(parents=True)
+    return path

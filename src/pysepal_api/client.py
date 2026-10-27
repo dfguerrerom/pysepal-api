@@ -124,7 +124,9 @@ class SepalClient:
         self.ee_exports = EEExportsEndpoint(
             self.tasks,
             origin=detect_origin(
-                app_name=app_name, browser_session=isinstance(resolved_auth, CookieAuth)
+                app_name=app_name,
+                module_name=module_name,
+                browser_session=isinstance(resolved_auth, CookieAuth),
             ),
         )
         self.exports = self.ee_exports
@@ -245,7 +247,9 @@ class AsyncSepalClient:
         self.ee_exports = AsyncEEExportsEndpoint(
             self.tasks,
             origin=detect_origin(
-                app_name=app_name, browser_session=isinstance(resolved_auth, CookieAuth)
+                app_name=app_name,
+                module_name=module_name,
+                browser_session=isinstance(resolved_auth, CookieAuth),
             ),
         )
         self.exports = self.ee_exports
