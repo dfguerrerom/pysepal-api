@@ -96,6 +96,29 @@ def test_repr_includes_status() -> None:
     assert "401" in str(err)
 
 
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"message": "Unsupported table export fileFormat: TIFF"},
+        {"defaultMessage": "Unsupported table export fileFormat: TIFF", "messageKey": "x"},
+    ],
+)
+def test_error_text_ends_with_the_reason_the_service_gave(body: dict[str, str]) -> None:
+    reason = "Unsupported table export fileFormat: TIFF"
+    err = error_for_status(400, url="https://x/api/tasks", body=body)
+    assert err.reason == reason
+    assert str(err) == f"SEPAL API 400 for https://x/api/tasks: {reason}"
+
+
+@pytest.mark.parametrize(
+    "body", [None, "<html>Bad Gateway</html>", {"message": "  "}, {"message": 42}, {"error": "no"}]
+)
+def test_error_text_has_no_reason_when_the_body_gives_none(body: object) -> None:
+    err = error_for_status(502, url="https://x/api/tasks", body=body)
+    assert err.reason is None
+    assert str(err) == "SEPAL API 502 for https://x/api/tasks"
+
+
 def test_missing_host_and_credentials() -> None:
     with pytest.raises(MissingHostError):
         raise MissingHostError("nope")
