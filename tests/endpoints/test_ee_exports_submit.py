@@ -57,6 +57,7 @@ def test_submit_image_to_sepal(http: httpx.Client) -> None:
     assert params["taskInfo"] == {
         "destination": "SEPAL",
         "outputPath": "module_results/my_module/exports",
+        "filenamePrefix": "ndvi_2026",
         "source": "pysepal-api",
         "kind": "IMAGE",
     }
@@ -106,6 +107,20 @@ def test_submit_table_to_drive_preserves_max_vertices(http: httpx.Client) -> Non
     assert export["destination"] == "DRIVE"
     assert export["driveFolder"] == "exports"
     assert export["maxVertices"] == 1_000_000
+
+
+@pytest.mark.parametrize("name, folder", [("plots", "plots"), ('plots/"2024"', "plots__2024_")])
+def test_drive_export_without_a_folder_goes_to_a_folder_named_after_it(
+    http: httpx.Client, name: str, folder: str
+) -> None:
+    with respx.mock(base_url="https://sepal.test") as mock:
+        route = mock.post("/api/tasks").respond(200, json={"id": "t-4", "state": "PENDING"})
+        _endpoint(http).submit_table(
+            collection={"result": "0", "values": {}}, destination="DRIVE", name=name
+        )
+    params = json.loads(route.calls.last.request.content)["params"]
+    assert params["export"]["driveFolder"] == folder
+    assert params["taskInfo"]["outputPath"] == folder
 
 
 def test_gee_image_requires_asset_id(http: httpx.Client) -> None:

@@ -14,6 +14,7 @@ Beneath that root:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -25,13 +26,19 @@ class PysepalError(Exception):
 
 
 class ApiError(PysepalError):
-    """Base for non-2xx responses from a SEPAL service."""
+    """Base for non-2xx responses from a SEPAL service.
+
+    ``reason`` is the message the service gave for the failure, if its body
+    carried one; the error text ends with it, so a traceback shows why.
+    """
 
     def __init__(self, status_code: int, *, url: str, body: Any = None) -> None:
         self.status_code = status_code
         self.url = url
         self.body = body
-        super().__init__(f"SEPAL API {status_code} for {url}")
+        self.reason = _reason(body)
+        suffix = f": {self.reason}" if self.reason else ""
+        super().__init__(f"SEPAL API {status_code} for {url}{suffix}")
 
 
 class BadRequest(ApiError):
@@ -135,6 +142,21 @@ _BY_STATUS: dict[int, type[ApiError]] = {
     409: Conflict,
     429: TooManyRequests,
 }
+
+
+# task-manager answers ``{"message": ...}``; services built on SEPAL's shared HTTP server answer
+# ``{"defaultMessage": ..., "messageKey": ...}``.
+_REASON_KEYS = ("message", "defaultMessage")
+
+
+def _reason(body: Any) -> str | None:
+    if not isinstance(body, Mapping):
+        return None
+    for key in _REASON_KEYS:
+        value = body.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
 
 
 def error_for_status(status_code: int, *, url: str, body: Any) -> ApiError:

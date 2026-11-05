@@ -49,6 +49,7 @@ IMAGE_TO_SEPAL_GOLDEN = {
     "taskInfo": {
         "destination": "SEPAL",
         "outputPath": "module_results/demo/exports",
+        "filenamePrefix": "ndvi",
         "source": "pysepal-api",
         "kind": "IMAGE",
     },
