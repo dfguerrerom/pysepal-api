@@ -22,12 +22,13 @@ it is missing.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from enum import Enum
 from typing import Any
 
 from ..errors import MissingDependency
 from ..models import Task
+from ..origin import checked_origin
 from .tasks import AsyncTasksEndpoint, TasksEndpoint
 
 _SOURCE = "pysepal-api"
@@ -182,6 +183,14 @@ def _table_export_fields(
     }
 
 
+def _export_origin(
+    given: Mapping[str, str] | None, origin_of: Callable[[], Mapping[str, str]] | None
+) -> Mapping[str, str] | None:
+    if given is not None:
+        return checked_origin(given)
+    return origin_of() if origin_of else None
+
+
 def _require_asset_id(destination: EEExportDestination, asset_id: str | None) -> None:
     if destination is EEExportDestination.GEE and not asset_id:
         raise ValueError("asset_id is required when destination is GEE")
@@ -288,9 +297,11 @@ def _table_params(
 class EEExportsEndpoint:
     """Submit Earth Engine image/table exports through SEPAL TaskManager (sync)."""
 
-    def __init__(self, tasks: TasksEndpoint, *, origin: Mapping[str, str] | None = None) -> None:
+    def __init__(
+        self, tasks: TasksEndpoint, *, origin_of: Callable[[], Mapping[str, str]] | None = None
+    ) -> None:
         self._tasks = tasks
-        self._origin = origin
+        self._origin_of = origin_of
 
     def submit_image(
         self,
@@ -318,6 +329,7 @@ class EEExportsEndpoint:
         workspace_path: str | None = None,
         drive_folder: str | None = None,
         filename_prefix: str | None = None,
+        origin: Mapping[str, str] | None = None,
         instance_type: str | None = None,
     ) -> Task:
         params = _image_params(
@@ -344,7 +356,7 @@ class EEExportsEndpoint:
             workspace_path=workspace_path,
             drive_folder=drive_folder,
             filename_prefix=filename_prefix,
-            origin=self._origin,
+            origin=_export_origin(origin, self._origin_of),
         )
         return self._tasks.submit("ee.export", params, instance_type=instance_type)
 
@@ -362,6 +374,7 @@ class EEExportsEndpoint:
         selectors: list[str] | None = None,
         max_vertices: int | None = None,
         strategy: str | None = None,
+        origin: Mapping[str, str] | None = None,
         instance_type: str | None = None,
     ) -> Task:
         params = _table_params(
@@ -376,7 +389,7 @@ class EEExportsEndpoint:
             selectors=selectors,
             max_vertices=max_vertices,
             strategy=strategy,
-            origin=self._origin,
+            origin=_export_origin(origin, self._origin_of),
         )
         return self._tasks.submit("ee.export", params, instance_type=instance_type)
 
@@ -385,10 +398,13 @@ class AsyncEEExportsEndpoint:
     """Submit Earth Engine image/table exports through SEPAL TaskManager (async)."""
 
     def __init__(
-        self, tasks: AsyncTasksEndpoint, *, origin: Mapping[str, str] | None = None
+        self,
+        tasks: AsyncTasksEndpoint,
+        *,
+        origin_of: Callable[[], Mapping[str, str]] | None = None,
     ) -> None:
         self._tasks = tasks
-        self._origin = origin
+        self._origin_of = origin_of
 
     async def submit_image(
         self,
@@ -416,6 +432,7 @@ class AsyncEEExportsEndpoint:
         workspace_path: str | None = None,
         drive_folder: str | None = None,
         filename_prefix: str | None = None,
+        origin: Mapping[str, str] | None = None,
         instance_type: str | None = None,
     ) -> Task:
         params = _image_params(
@@ -442,7 +459,7 @@ class AsyncEEExportsEndpoint:
             workspace_path=workspace_path,
             drive_folder=drive_folder,
             filename_prefix=filename_prefix,
-            origin=self._origin,
+            origin=_export_origin(origin, self._origin_of),
         )
         return await self._tasks.submit("ee.export", params, instance_type=instance_type)
 
@@ -460,6 +477,7 @@ class AsyncEEExportsEndpoint:
         selectors: list[str] | None = None,
         max_vertices: int | None = None,
         strategy: str | None = None,
+        origin: Mapping[str, str] | None = None,
         instance_type: str | None = None,
     ) -> Task:
         params = _table_params(
@@ -474,6 +492,6 @@ class AsyncEEExportsEndpoint:
             selectors=selectors,
             max_vertices=max_vertices,
             strategy=strategy,
-            origin=self._origin,
+            origin=_export_origin(origin, self._origin_of),
         )
         return await self._tasks.submit("ee.export", params, instance_type=instance_type)

@@ -25,8 +25,9 @@ or `sepal = await AsyncSepalClient.create(...)`, then `close()` / `aclose()`.
 
 from __future__ import annotations
 
+import functools
 import os
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import PurePosixPath
 from typing import Any
 
@@ -85,6 +86,19 @@ def _resolve_config(
     return resolved_base_url, resolved_auth, resolved_verify
 
 
+def _origin_detector(
+    app_name: str | None, module_name: str | None, auth: httpx.Auth
+) -> Callable[[], dict[str, str]]:
+    """Detect each export's origin when it is submitted: the working directory
+    and running code can change over a long-lived client's life."""
+    return functools.partial(
+        detect_origin,
+        app_name=app_name,
+        module_name=module_name,
+        browser_session=isinstance(auth, CookieAuth),
+    )
+
+
 class SepalClient:
     """Synchronous HTTP client for SEPAL services."""
 
@@ -122,12 +136,7 @@ class SepalClient:
         self.tasks = TasksEndpoint(self._http)
         self.recipes = RecipesEndpoint(self._http)
         self.ee_exports = EEExportsEndpoint(
-            self.tasks,
-            origin=detect_origin(
-                app_name=app_name,
-                module_name=module_name,
-                browser_session=isinstance(resolved_auth, CookieAuth),
-            ),
+            self.tasks, origin_of=_origin_detector(app_name, module_name, resolved_auth)
         )
         self.exports = self.ee_exports
 
@@ -245,12 +254,7 @@ class AsyncSepalClient:
         self.tasks = AsyncTasksEndpoint(self._http)
         self.recipes = AsyncRecipesEndpoint(self._http)
         self.ee_exports = AsyncEEExportsEndpoint(
-            self.tasks,
-            origin=detect_origin(
-                app_name=app_name,
-                module_name=module_name,
-                browser_session=isinstance(resolved_auth, CookieAuth),
-            ),
+            self.tasks, origin_of=_origin_detector(app_name, module_name, resolved_auth)
         )
         self.exports = self.ee_exports
 

@@ -10,19 +10,24 @@ from typing import Any
 import pytest
 import respx
 
+import pysepal_api.origin
 from pysepal_api import AsyncSepalClient, NoAuth, SepalClient
 
 
 @pytest.fixture(autouse=True)
 def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """A sandbox working in the home folder, with no notebook, script or app
-    context unless a test adds one."""
-    home = tmp_path / "alice"
+    """A sandbox working in the SEPAL home folder, with no notebook, script or
+    app context unless a test adds one."""
+    home = tmp_path / "sepal-user"
     home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
+    key = tmp_path / "sepal-api-key"
+    key.write_text("key")
+    monkeypatch.setattr(pysepal_api.origin, "SANDBOX_KEY_PATH", str(key))
+    monkeypatch.setattr(pysepal_api.origin, "BASE_REMOTE_PATH", str(home))
     monkeypatch.chdir(home)
     monkeypatch.delenv("JPY_SESSION_NAME", raising=False)
     monkeypatch.setitem(sys.modules, "__main__", types.ModuleType("__main__"))
+    monkeypatch.setattr(sys, "argv", ["python"])
     return home
 
 
@@ -133,6 +138,133 @@ def test_sandbox_export_from_a_deleted_working_directory_has_no_path(
     assert origin == {"type": "SANDBOX"}
 
 
+def test_a_console_is_not_a_notebook(home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("JPY_SESSION_NAME", f"{home}/Console 1")
+
+    origin = submitted_origin(SepalClient(base_url="https://sepal.test", auth=NoAuth()))
+
+    assert origin == {"type": "SANDBOX", "path": "."}
+
+
+def test_a_script_run_from_a_notebook_names_the_script(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("JPY_SESSION_NAME", f"{home}/analysis.ipynb")
+    sys.modules["__main__"].__file__ = f"{home}/scripts/export.py"
+
+    origin = submitted_origin(SepalClient(base_url="https://sepal.test", auth=NoAuth()))
+
+    assert origin == {"type": "SCRIPT", "path": "scripts/export.py"}
+
+
+def test_vscode_names_its_notebook_over_the_session_name_it_gives_a_jupyter_server(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("JPY_SESSION_NAME", f"{home}/explore-jvsc-6f1c2b9e.ipynb")
+    sys.modules["__main__"].__vsc_ipynb_file__ = f"{home}/work/explore.ipynb"  # type: ignore[attr-defined]
+
+    origin = submitted_origin(SepalClient(base_url="https://sepal.test", auth=NoAuth()))
+
+    assert origin == {"type": "NOTEBOOK", "path": "work/explore.ipynb"}
+
+
+def test_a_launcher_names_the_script_it_runs(home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    apps = make_dir(home / "apps")
+    (apps / "app.py").write_text("")
+    monkeypatch.chdir(apps)
+    launcher = str(Path(sys.prefix) / "bin" / "solara")
+    sys.modules["__main__"].__file__ = launcher
+    monkeypatch.setattr(sys, "argv", [launcher, "run", "app.py"])
+
+    origin = submitted_origin(SepalClient(base_url="https://sepal.test", auth=NoAuth()))
+
+    assert origin == {"type": "SCRIPT", "path": "apps/app.py"}
+
+
+def test_a_launcher_without_a_script_names_its_working_directory(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(make_dir(home / "api"))
+    launcher = str(Path(sys.prefix) / "bin" / "uvicorn")
+    sys.modules["__main__"].__file__ = launcher
+    monkeypatch.setattr(sys, "argv", [launcher, "main:app"])
+
+    origin = submitted_origin(SepalClient(base_url="https://sepal.test", auth=NoAuth()))
+
+    assert origin == {"type": "SANDBOX", "path": "api"}
+
+
+def test_the_origin_is_where_the_export_is_submitted_from(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = SepalClient(base_url="https://sepal.test", auth=NoAuth())
+    monkeypatch.chdir(make_dir(home / "later"))
+
+    origin = submitted_origin(client)
+
+    assert origin == {"type": "SANDBOX", "path": "later"}
+
+
+def test_outside_a_sandbox_only_the_kind_of_origin_is_sent(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(pysepal_api.origin, "SANDBOX_KEY_PATH", str(home / "no-key"))
+    monkeypatch.setenv("JPY_SESSION_NAME", "/Users/alice/proj/x.ipynb")
+
+    origin = submitted_origin(SepalClient(base_url="https://sepal.test", auth=NoAuth()))
+
+    assert origin == {"type": "NOTEBOOK"}
+
+
+def test_outside_a_sandbox_an_app_is_still_named(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(pysepal_api.origin, "SANDBOX_KEY_PATH", str(home / "no-key"))
+
+    origin = submitted_origin(
+        SepalClient(base_url="https://sepal.test", auth=NoAuth(), app_name="se.plan")
+    )
+
+    assert origin == {"type": "APP", "name": "se.plan"}
+
+
+def test_an_origin_given_with_the_export_is_sent_as_given() -> None:
+    given = {"type": "NOTEBOOK", "path": "reports/run.ipynb"}
+
+    origin = submitted_origin(
+        SepalClient(base_url="https://sepal.test", auth=NoAuth(), app_name="se.plan"),
+        origin=given,
+    )
+
+    assert origin == given
+
+
+def test_an_origin_of_unknown_type_is_refused_before_submitting() -> None:
+    with respx.mock(base_url="https://sepal.test", assert_all_called=False) as mock:
+        route = mock.post("/api/tasks").respond(200, json={"id": "t-1", "state": "PENDING"})
+        with SepalClient(base_url="https://sepal.test", auth=NoAuth()) as client:
+            with pytest.raises(ValueError, match="NOTEBOOK, SCRIPT, APP or SANDBOX"):
+                client.ee_exports.submit_table(
+                    collection={"result": "0", "values": {}},
+                    destination="SEPAL",
+                    name="plots",
+                    origin={"type": "LAPTOP"},
+                )
+    assert not route.called
+
+
+async def test_async_client_takes_an_origin_with_the_export() -> None:
+    given = {"type": "SCRIPT", "path": "jobs/run.py"}
+    with respx.mock(base_url="https://sepal.test") as mock:
+        route = mock.post("/api/tasks").respond(200, json={"id": "t-1", "state": "PENDING"})
+        async with AsyncSepalClient.create(base_url="https://sepal.test", auth=NoAuth()) as client:
+            await client.ee_exports.submit_image(
+                image={"result": "0", "values": {}}, destination="SEPAL", name="ndvi", origin=given
+            )
+
+    assert task_info(route)["origin"] == given
+
+
 async def test_async_client_sends_the_same_origin() -> None:
     with respx.mock(base_url="https://sepal.test") as mock:
         route = mock.post("/api/tasks").respond(200, json={"id": "t-1", "state": "PENDING"})
@@ -146,12 +278,15 @@ async def test_async_client_sends_the_same_origin() -> None:
     assert task_info(route)["origin"] == {"type": "APP", "name": "se.plan"}
 
 
-def submitted_origin(client: SepalClient) -> Any:
+def submitted_origin(client: SepalClient, **export_options: Any) -> Any:
     with respx.mock(base_url="https://sepal.test") as mock:
         route = mock.post("/api/tasks").respond(200, json={"id": "t-1", "state": "PENDING"})
         with client:
             client.ee_exports.submit_image(
-                image={"result": "0", "values": {}}, destination="SEPAL", name="ndvi"
+                image={"result": "0", "values": {}},
+                destination="SEPAL",
+                name="ndvi",
+                **export_options,
             )
     return task_info(route).get("origin")
 
