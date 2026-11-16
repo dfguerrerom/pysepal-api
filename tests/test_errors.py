@@ -1,3 +1,5 @@
+import pickle
+
 import pytest
 
 from pysepal_api.errors import (
@@ -117,6 +119,36 @@ def test_error_text_has_no_reason_when_the_body_gives_none(body: object) -> None
     err = error_for_status(502, url="https://x/api/tasks", body=body)
     assert err.reason is None
     assert str(err) == "SEPAL API 502 for https://x/api/tasks"
+
+
+def test_error_text_shows_a_multiline_reason_on_one_line() -> None:
+    err = error_for_status(500, url="https://x/api/tasks", body={"message": "Boom\n  at a()\n"})
+    assert err.reason == "Boom\n  at a()"
+    assert str(err) == "SEPAL API 500 for https://x/api/tasks: Boom at a()"
+
+
+def test_error_text_shortens_a_long_reason() -> None:
+    reason = "x" * 5000
+    err = error_for_status(500, url="https://x/api/tasks", body={"message": reason})
+    assert err.reason == reason
+    assert len(str(err)) < 400
+    assert str(err).endswith("…")
+
+
+@pytest.mark.parametrize("status_code", [400, 418, 503])
+def test_api_errors_survive_pickling(status_code: int) -> None:
+    err = error_for_status(status_code, url="https://x/api/tasks", body={"message": "No such task"})
+    err.__notes__ = ["while exporting"]  # what add_note() does on 3.11+
+    copy = pickle.loads(pickle.dumps(err))
+    assert type(copy) is type(err)
+    assert (copy.status_code, copy.url, copy.body, copy.reason) == (
+        status_code,
+        "https://x/api/tasks",
+        {"message": "No such task"},
+        "No such task",
+    )
+    assert str(copy) == str(err)
+    assert copy.__notes__ == ["while exporting"]
 
 
 def test_missing_host_and_credentials() -> None:
