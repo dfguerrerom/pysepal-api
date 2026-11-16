@@ -9,6 +9,10 @@ block plus a ``taskInfo`` block. ``expression``/``region`` are Earth Engine
 **Cloud API expression dicts** (from ``ee.serializer.encode(obj,
 for_cloud_api=True)``), never strings. Only keys with values are emitted.
 
+Destination options are sent as the caller gave them. SEPAL resolves the
+defaults (workspace folder, Drive folder, file name prefix) and records in
+``taskInfo`` where the export lands.
+
 ``serialize_ee_object`` accepts an already-encoded expression dict unchanged, so
 callers (and tests) can pass expression dicts without ``earthengine-api``
 installed; encoding a live ``ee`` object lazily imports ``ee`` and raises
@@ -18,7 +22,6 @@ it is missing.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
 from enum import Enum
 from typing import Any
@@ -74,16 +77,6 @@ def _clean(fields: Mapping[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in fields.items() if value is not None}
 
 
-def _resolve_output_path(export: Mapping[str, Any], name: str) -> str:
-    """Conflict-detection key: first non-empty of assetId / workspacePath /
-    driveFolder / filenamePrefix, else the export name."""
-    for key in ("assetId", "workspacePath", "driveFolder", "filenamePrefix"):
-        value = export.get(key)
-        if value:
-            return str(value)
-    return name
-
-
 def _build_params(
     *,
     kind: EEExportKind,
@@ -95,23 +88,16 @@ def _build_params(
     """Assemble the ``params`` block for a ``ee.export`` task.
 
     ``export_fields`` carries the destination/kind-specific camelCase keys
-    (``None`` values are dropped); ``kind`` and ``destination`` are added and
-    the ``taskInfo`` block is derived.
+    (``None`` values are dropped); ``kind`` and ``destination`` are added.
     """
     export: dict[str, Any] = {
         "kind": kind.value,
         "destination": destination.value,
         **_clean(export_fields),
     }
-    task_info: dict[str, Any] = _clean(
-        {
-            "destination": destination.value,
-            "outputPath": _resolve_output_path(export, name),
-            "filenamePrefix": export.get("filenamePrefix"),
-            "source": _SOURCE,
-            "kind": kind.value,
-        }
-    )
+    # task-manager sets taskInfo's kind, destination, outputPath and filenamePrefix from the
+    # export it resolves, replacing whatever a client sends.
+    task_info: dict[str, Any] = {"source": _SOURCE}
     if origin:
         task_info["origin"] = dict(origin)
     return {
@@ -196,21 +182,6 @@ def _table_export_fields(
     }
 
 
-def _drive_folder(
-    destination: EEExportDestination, drive_folder: str | None, name: str
-) -> str | None:
-    if destination is EEExportDestination.DRIVE and not drive_folder:
-        return _drive_folder_name(name)
-    return drive_folder
-
-
-# Mirrors SEPAL's `exportFolderName`, so the default folder is the one SEPAL writes to and the
-# task list shows. SEPAL picks the default workspace folder itself.
-def _drive_folder_name(name: str) -> str:
-    folder = re.sub(r'[/\\"]', "_", name).strip()
-    return "export" if folder in ("", ".", "..") else folder
-
-
 def _require_asset_id(destination: EEExportDestination, asset_id: str | None) -> None:
     if destination is EEExportDestination.GEE and not asset_id:
         raise ValueError("asset_id is required when destination is GEE")
@@ -245,7 +216,6 @@ def _image_params(
 ) -> dict[str, Any]:
     dest = _coerce_destination(destination)
     _require_asset_id(dest, asset_id)
-    drive_folder = _drive_folder(dest, drive_folder, name)
     export_fields = _image_export_fields(
         image=image,
         region=region,
@@ -295,7 +265,6 @@ def _table_params(
 ) -> dict[str, Any]:
     dest = _coerce_destination(destination)
     _require_asset_id(dest, asset_id)
-    drive_folder = _drive_folder(dest, drive_folder, name)
     export_fields = _table_export_fields(
         collection=collection,
         asset_id=asset_id,

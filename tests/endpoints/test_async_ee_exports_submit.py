@@ -39,13 +39,7 @@ async def test_submit_image_to_drive(http: httpx.AsyncClient) -> None:
         "driveFolder": "SEPAL/exports",
         "filenamePrefix": "ndvi_2026",
     }
-    assert params["taskInfo"] == {
-        "destination": "DRIVE",
-        "outputPath": "SEPAL/exports",
-        "filenamePrefix": "ndvi_2026",
-        "source": "pysepal-api",
-        "kind": "IMAGE",
-    }
+    assert params["taskInfo"] == {"source": "pysepal-api"}
     assert task.id == "t-9"
 
 

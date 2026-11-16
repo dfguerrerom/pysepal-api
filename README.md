@@ -69,7 +69,7 @@ with SepalClient(session_id="...", module_name="my_module") as sepal:
     # → Google Drive
     sepal.ee_exports.submit_image(
         image=image, region=region, destination="DRIVE",
-        name="ndvi_2026", scale=30, drive_folder="SEPAL/exports",
+        name="ndvi_2026", scale=30, drive_folder="ndvi",
     )
 
     # → Earth Engine asset (asset_id is required for GEE)
@@ -90,7 +90,9 @@ with SepalClient(session_id="...", module_name="my_module") as sepal:
 
 Notes:
 
-- `workspace_path` is **relative to your SEPAL home directory** — never pass an absolute path (the worker rejects `..` traversal). Without it, files go to `downloads/<name>`; without `drive_folder`, Drive exports go to a folder named after the export.
+- `workspace_path` is **relative to your SEPAL home directory** — never pass an absolute path (the worker rejects `..` traversal). The folder must not already hold files, and two running exports cannot share one. Without it, each export gets its own folder in `downloads/`, named after the export and its task.
+- `drive_folder` is a single folder inside `SEPAL/exports/` in your Drive; SEPAL replaces `/`, `\` and `"` in it with `_`. Without it, the folder is named after the export. SEPAL's task list shows the folder and file name prefix each export actually uses.
+- Without `region`, an image is exported over its footprint. An image with no bounds, such as a constant image or a mosaic, fails, so give it a region.
 - `destination="GEE"` requires `asset_id`; omitting it raises `ValueError` before any network call.
 - `image` / `collection` / `region` accept either a live EE object (encoded for you) or an already-encoded Cloud API expression dict (no `[ee]` extra needed).
 - Table `max_vertices` is supported by the current backend only for Drive exports. ImageCollection asset exports require SEPAL's tiled recipe workflow.
