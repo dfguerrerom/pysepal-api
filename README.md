@@ -40,7 +40,7 @@ TLS is verified by default. `host.docker.internal` is auto-skipped for local dev
 
 `sepal.ee_exports` (alias `sepal.exports`) routes notebook-created `ee.Image` and `ee.FeatureCollection` exports through SEPAL's TaskManager. It serializes the EE object into a Cloud API expression and submits an `ee.export` task — no new HTTP route, so `tasks.wait(task.id)` tracks it like any other task.
 
-Requires the SEPAL backend adapter in [openforis/sepal#454](https://github.com/openforis/sepal/pull/454). See [the export notebook](examples/ee_exports.ipynb) for a runnable sandbox example.
+Requires a SEPAL server that runs `ee.export` tasks. See [the export notebook](examples/ee_exports.ipynb) for a runnable sandbox example.
 
 Serializing a live EE object needs the optional Earth Engine extra:
 
@@ -69,7 +69,7 @@ with SepalClient(session_id="...", module_name="my_module") as sepal:
     # → Google Drive
     sepal.ee_exports.submit_image(
         image=image, region=region, destination="DRIVE",
-        name="ndvi_2026", scale=30, drive_folder="SEPAL/exports",
+        name="ndvi_2026", scale=30, drive_folder="ndvi",
     )
 
     # → Earth Engine asset (asset_id is required for GEE)
@@ -90,8 +90,11 @@ with SepalClient(session_id="...", module_name="my_module") as sepal:
 
 Notes:
 
-- `workspace_path` is **relative to your SEPAL home directory** — never pass an absolute path (the worker rejects `..` traversal).
+- `workspace_path` is **relative to your SEPAL home directory** — never pass an absolute path (the worker rejects `..` traversal). The folder must not already hold files, and two running exports cannot share one. Without it, each export gets its own folder in `downloads/`, named after the export and its task.
+- `drive_folder` is a single folder inside `SEPAL/exports/` in your Drive; SEPAL replaces `/`, `\` and `"` in it with `_`. Without it, the folder is named after the export. SEPAL's task list shows the folder and file name prefix each export actually uses.
+- Without `region`, an image is exported over its footprint. An image with no bounds, such as a constant image or a mosaic, fails, so give it a region.
 - `destination="GEE"` requires `asset_id`; omitting it raises `ValueError` before any network call.
 - `image` / `collection` / `region` accept either a live EE object (encoded for you) or an already-encoded Cloud API expression dict (no `[ee]` extra needed).
 - Table `max_vertices` is supported by the current backend only for Drive exports. ImageCollection asset exports require SEPAL's tiled recipe workflow.
+- SEPAL's task list shows where each export came from: the notebook or script path (relative to your home directory), or the app. Apps name themselves with `SepalClient(..., app_name="se.plan")`; without it, a client signed in with `session_id` is named after its `module_name`. Code with no notebook or script (a Python shell, a console, `python -c`, Voila) shows its working directory. Outside a SEPAL sandbox no local path is sent, only the kind of origin. To name the origin yourself, pass it with the export: `origin={"type": "SCRIPT", "path": "jobs/run.py"}` (type `NOTEBOOK`, `SCRIPT`, `APP` or `SANDBOX`; an `APP` takes a `"name"` instead of a `"path"`).
 - The async twin `AsyncSepalClient.ee_exports` has the identical surface, differing only by `await`.

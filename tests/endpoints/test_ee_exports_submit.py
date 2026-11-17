@@ -54,12 +54,7 @@ def test_submit_image_to_sepal(http: httpx.Client) -> None:
         "workspacePath": "module_results/my_module/exports",
         "filenamePrefix": "ndvi_2026",
     }
-    assert params["taskInfo"] == {
-        "destination": "SEPAL",
-        "outputPath": "module_results/my_module/exports",
-        "source": "pysepal-api",
-        "kind": "IMAGE",
-    }
+    assert params["taskInfo"] == {"source": "pysepal-api"}
     assert task.id == "t-1"
 
 
@@ -83,12 +78,7 @@ def test_submit_table_to_gee(http: httpx.Client) -> None:
         "assetId": "projects/my-project/assets/plots",
         "selectors": ["id"],
     }
-    assert params["taskInfo"] == {
-        "destination": "GEE",
-        "outputPath": "projects/my-project/assets/plots",
-        "source": "pysepal-api",
-        "kind": "TABLE",
-    }
+    assert params["taskInfo"] == {"source": "pysepal-api"}
     assert task.id == "t-2"
 
 
@@ -106,6 +96,19 @@ def test_submit_table_to_drive_preserves_max_vertices(http: httpx.Client) -> Non
     assert export["destination"] == "DRIVE"
     assert export["driveFolder"] == "exports"
     assert export["maxVertices"] == 1_000_000
+
+
+@pytest.mark.parametrize("destination", ["DRIVE", "SEPAL"])
+def test_folder_and_prefix_left_out_are_left_to_sepal(http: httpx.Client, destination: str) -> None:
+    with respx.mock(base_url="https://sepal.test") as mock:
+        route = mock.post("/api/tasks").respond(200, json={"id": "t-4", "state": "PENDING"})
+        _endpoint(http).submit_table(
+            collection={"result": "0", "values": {}}, destination=destination, name='plots/"2024"'
+        )
+    params = json.loads(route.calls.last.request.content)["params"]
+    assert params["description"] == 'plots/"2024"'
+    assert params["export"].keys().isdisjoint({"driveFolder", "workspacePath", "filenamePrefix"})
+    assert params["taskInfo"] == {"source": "pysepal-api"}
 
 
 def test_gee_image_requires_asset_id(http: httpx.Client) -> None:

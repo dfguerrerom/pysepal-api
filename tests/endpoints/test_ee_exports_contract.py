@@ -46,12 +46,7 @@ IMAGE_TO_SEPAL_GOLDEN = {
         "workspacePath": "module_results/demo/exports",
         "filenamePrefix": "ndvi",
     },
-    "taskInfo": {
-        "destination": "SEPAL",
-        "outputPath": "module_results/demo/exports",
-        "source": "pysepal-api",
-        "kind": "IMAGE",
-    },
+    "taskInfo": {"source": "pysepal-api"},
 }
 
 TABLE_TO_GEE_GOLDEN = {
@@ -65,12 +60,7 @@ TABLE_TO_GEE_GOLDEN = {
         "assetId": "projects/my-project/assets/exports/plots",
         "selectors": ["id", "class"],
     },
-    "taskInfo": {
-        "destination": "GEE",
-        "outputPath": "projects/my-project/assets/exports/plots",
-        "source": "pysepal-api",
-        "kind": "TABLE",
-    },
+    "taskInfo": {"source": "pysepal-api"},
 }
 
 

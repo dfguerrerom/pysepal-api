@@ -24,6 +24,21 @@ PysepalError
     └── TaskTimeout         (also a TimeoutError; wait() exceeded its timeout)
 ```
 
+## Why a request failed
+
+When a SEPAL service says why it refused a request, `ApiError.reason` holds
+that message and the error text ends with it. The full response body stays
+available as `ApiError.body`.
+
+```python
+from pysepal_api import BadRequest
+
+try:
+    sepal.ee_exports.submit_table(collection=fc, destination="SEPAL", name="plots", file_format="TIFF")
+except BadRequest as exc:
+    print(exc.reason)   # Unsupported table export fileFormat: TIFF; expected CSV, GeoJSON, KML, KMZ or SHP
+```
+
 ## Catch specific cases
 
 ```python

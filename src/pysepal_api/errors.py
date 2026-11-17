@@ -14,6 +14,8 @@ Beneath that root:
 
 from __future__ import annotations
 
+import functools
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -25,13 +27,25 @@ class PysepalError(Exception):
 
 
 class ApiError(PysepalError):
-    """Base for non-2xx responses from a SEPAL service."""
+    """Base for non-2xx responses from a SEPAL service.
+
+    ``reason`` is the message the service gave for the failure, if its body
+    carried one. The error text ends with it, on one line and shortened if
+    long, so a traceback shows why.
+    """
 
     def __init__(self, status_code: int, *, url: str, body: Any = None) -> None:
         self.status_code = status_code
         self.url = url
         self.body = body
-        super().__init__(f"SEPAL API {status_code} for {url}")
+        self.reason = _reason(body)
+        suffix = f": {_one_line(self.reason)}" if self.reason else ""
+        super().__init__(f"SEPAL API {status_code} for {url}{suffix}")
+
+    # Exception pickling re-calls __init__ with self.args, which hold only the error text.
+    def __reduce__(self) -> tuple[Any, ...]:
+        rebuild = functools.partial(type(self), url=self.url, body=self.body)
+        return rebuild, (self.status_code,), self.__dict__
 
 
 class BadRequest(ApiError):
@@ -135,6 +149,30 @@ _BY_STATUS: dict[int, type[ApiError]] = {
     409: Conflict,
     429: TooManyRequests,
 }
+
+
+# task-manager answers ``{"message": ...}``; services built on SEPAL's shared HTTP server answer
+# ``{"defaultMessage": ..., "messageKey": ...}``.
+_REASON_KEYS = ("message", "defaultMessage")
+
+
+def _reason(body: Any) -> str | None:
+    if not isinstance(body, Mapping):
+        return None
+    for key in _REASON_KEYS:
+        value = body.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+_MAX_REASON_TEXT = 300
+
+
+# The reason is server text: a stack trace in it would flood logs and could forge log lines.
+def _one_line(reason: str) -> str:
+    text = " ".join(reason.split())
+    return text if len(text) <= _MAX_REASON_TEXT else text[: _MAX_REASON_TEXT - 1] + "…"
 
 
 def error_for_status(status_code: int, *, url: str, body: Any) -> ApiError:
