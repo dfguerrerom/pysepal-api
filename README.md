@@ -40,7 +40,7 @@ TLS is verified by default. `host.docker.internal` is auto-skipped for local dev
 
 `sepal.ee_exports` (alias `sepal.exports`) routes notebook-created `ee.Image` and `ee.FeatureCollection` exports through SEPAL's TaskManager. It serializes the EE object into a Cloud API expression and submits an `ee.export` task — no new HTTP route, so `tasks.wait(task.id)` tracks it like any other task.
 
-Requires the SEPAL backend adapter in [openforis/sepal#454](https://github.com/openforis/sepal/pull/454). See [the export notebook](examples/ee_exports.ipynb) for a runnable sandbox example.
+Requires a SEPAL server that runs `ee.export` tasks. See [the export notebook](examples/ee_exports.ipynb) for a runnable sandbox example.
 
 Serializing a live EE object needs the optional Earth Engine extra:
 
